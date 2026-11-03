@@ -18,7 +18,7 @@ over shielded notes. Design: [`../docs/POLYPUS_DESIGN.md`](../docs/POLYPUS_DESIG
 | `circuits/polypus_notes` | Noir library shared by the kernel and future programs |
 | `circuits/kernel` | 2-in/2-out kernel circuit; a negative test for every constraint |
 | `crates/polypus-prover` | nargo → Sunspot Groth16 proving glue, `polypus-prove` CLI |
-| `programs/` | Anchor pool program (init/deposit/transact/withdraw) with an on-chain Groth16 verifier; see `programs/README.md` |
+| `programs/` | Anchor pool program (init/deposit/transact/withdraw) with an on-chain Groth16 verifier. End to end on LiteSVM and `solana-test-validator` with real kernel proofs, ~212k–226k CU per action; see `programs/README.md` |
 | `docs/adr/` | Architecture decision records |
 | `docs/benchmarks.md` | Constraint count, proving time, CU |
 
@@ -80,8 +80,20 @@ cargo build --release -p polypus-prover
 ./target/release/polypus-prove bench 20
 ./target/release/polypus-prove diff 10000 8  # Rust reference vs Noir circuit, random + mutated witnesses
 
-# 5. Solana pool program: see programs/README.md
+# 5. Solana pool program (LiteSVM): unit tests, then end to end with REAL kernel proofs
+cd programs && anchor build                     # compiles ../artifacts/dev/kernel.vk into the pool
+cargo test --release --workspace
+cargo test --release -p polypus-tests --test kernel_e2e -- --ignored --nocapture --test-threads 1
+cd ..
+
+# 6. Localnet (solana-test-validator): deploy + deposit → transfer → withdraw, with CU
+scripts/localnet-e2e.sh
 ```
+
+The localnet script needs the program keypair
+`programs/keys/polypus_pool-keypair.json`. It is git-ignored and must match
+`declare_id!`. On a fresh clone, generate one with `solana-keygen grind` and
+update `declare_id!` and `Anchor.toml`.
 
 ## Security notes
 
