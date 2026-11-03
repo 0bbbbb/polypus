@@ -1,0 +1,9 @@
+[package]
+name = "polypus_notes"
+type = "lib"
+authors = ["Polypus"]
+# Pinned toolchain: nargo 1.0.0-beta.22 (Sunspot v1.0.0 requirement); see docs/adr/0001.
+
+[dependencies]
+# circomlib-compatible Poseidon (== sol_poseidon == light-poseidon). Pinned: v0.4.0 = e105cdd5c79c222860d53c5dfdb8fa8012b291c0
+poseidon = { tag = "v0.4.0", git = "https://github.com/noir-lang/poseidon" }
