@@ -1,0 +1,23 @@
+# UNAUDITED — DEVNET / LOCALNET ONLY. Never deploy to mainnet.
+[toolchain]
+anchor_version = "1.2.2"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+polypus_pool = "PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu"
+
+[programs.devnet]
+polypus_pool = "PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu"
+
+[workspace]
+members = ["polypus-pool"]
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test -p polypus-tests -- --nocapture"

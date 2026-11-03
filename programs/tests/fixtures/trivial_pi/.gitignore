@@ -1,0 +1,4 @@
+target/
+Prover.toml
+*.proof
+*.pw

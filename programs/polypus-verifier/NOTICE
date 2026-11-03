@@ -1,0 +1,29 @@
+polypus-verifier
+================
+
+This crate is a vendored and modified copy of `gnark-verifier-solana`
+(crates/verifier-lib) by Reilabs, from https://github.com/reilabs/sunspot
+(gnark-solana/crates/verifier-lib, commit 0a9f7d0), licensed under the
+Apache License, Version 2.0 (see LICENSE in this directory).
+
+Parts of the upstream code were themselves adapted from
+https://github.com/Lightprotocol/groth16-solana (Apache-2.0), as noted in the
+individual file headers.
+
+Modifications by the Polypus contributors (2026-11):
+  * Ported from solana-program 2.2 to solana-bn254 3.2 / solana-define-syscall 5
+    (the crate majors used by anchor-lang 1.2.2); uses the explicit *_BE
+    alt_bn128 op codes. ark-serialize bumped 0.4 -> 0.5; unused deps dropped.
+  * Hardening: the verifier rejects a NR_INPUTS / N_COMMITMENTS mismatch with
+    the verifying key, rejects non-canonical public inputs (>= r), and the
+    proof parser rejects a commitment count that differs from N_COMMITMENTS.
+  * `write_vk_const_file` emits fully-qualified paths so the generated file can
+    be `include!`d from OUT_DIR, plus a `VK_SHA256` constant.
+  * CU optimisations (same results, covered by the upstream and new tests):
+    -α, -γ, -δ are precomputed when the VK is parsed (build time) instead of
+    being negated on every verification; SHA-256 in hash-to-field uses
+    solana-sha256-hasher (sol_sha256 syscall on-chain); the 48-byte mod-r
+    reduction in hash-to-field uses `fr_from_be_48` (differentially tested
+    against arkworks' `from_be_bytes_mod_order`).
+  * Upstream unit tests re-pointed at the test fixtures shipped in
+    test_files/ (upstream's fixtures are gitignored there).

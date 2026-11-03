@@ -1,0 +1,6 @@
+/target/
+/test-ledger/
+/.anchor/
+# Keypairs must never be committed.
+/keys/*.json
+*-keypair.json

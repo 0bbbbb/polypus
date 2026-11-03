@@ -1,0 +1,30 @@
+[package]
+name = "polypus-verifier-bench"
+version = "0.1.0"
+description = "TEST-ONLY SBF program: benchmarks the vendored verifier, sol_poseidon and the pool's tree append. Never deploy."
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "polypus_verifier_bench"
+
+[dependencies]
+anchor-lang = "=1.2.2"
+bytemuck = { version = "1", features = ["extern_crate_alloc"] }
+polypus-pool = { path = "../polypus-pool", features = ["no-entrypoint"] }
+polypus-verifier = { path = "../polypus-verifier" }
+
+[target.'cfg(target_os = "solana")'.dependencies]
+solana-define-syscall = "5.0"
+
+[build-dependencies]
+polypus-verifier = { path = "../polypus-verifier" }
+
+[features]
+custom-heap = []
+custom-panic = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

@@ -1,0 +1,6 @@
+[package]
+name = "trivial_pi"
+type = "bin"
+authors = [""]
+
+[dependencies]

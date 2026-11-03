@@ -1,0 +1,20 @@
+# Separate Cargo workspace for on-chain (SBF) code and its LiteSVM tests, so
+# SBF builds do not share a lockfile with the host-only crates in ../crates.
+[workspace]
+members = [
+    "polypus-verifier",
+    "polypus-pool",
+    "verifier-bench",
+    "tests",
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
