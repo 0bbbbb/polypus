@@ -6,6 +6,10 @@ edition = "2021"
 license = "Apache-2.0"
 publish = false
 
+[[bin]]
+name = "localnet-e2e"
+path = "src/bin/localnet_e2e.rs"
+
 [dependencies]
 litesvm = "=0.18.1"
 # Same requirements as litesvm 0.18.1, so the types unify.
@@ -40,6 +44,12 @@ solana-transaction-context = "=4.3.2"
 
 polypus-crypto = { path = "../../crates/polypus-crypto" }
 polypus-prover = { path = "../../crates/polypus-prover" }
+
+# localnet_e2e binary (RPC client pinned to the same Agave 4.3.2 line as the test runtime crates)
+solana-rpc-client = "=4.3.2"
+solana-rpc-client-api = "=4.3.2"
+solana-transaction-status-client-types = "=4.3.2"
+solana-commitment-config = "3.1"
 sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
