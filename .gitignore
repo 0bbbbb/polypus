@@ -17,3 +17,4 @@ test-ledger/
 # Noir
 circuits/**/Prover.toml
 !circuits/**/Prover.example.toml
+circuits/kernel/.tmp/

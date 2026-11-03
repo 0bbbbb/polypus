@@ -1,5 +1,5 @@
 {
-  "params": "circomlib BN254 x^5",
+  "params": "circomlib BN254 x^5 (light-poseidon new_circom / sol_poseidon Bn254X5 BE / noir-lang/poseidon bn254::hash_n)",
   "vectors": [
     {
       "inputs": [
