@@ -1,0 +1,10 @@
+[package]
+name = "polypus-prover"
+description = "Proving pipeline glue: witness -> nargo -> Sunspot Groth16 (dev only)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+polypus-crypto = { path = "../polypus-crypto" }

@@ -1,0 +1,19 @@
+# Build outputs
+target/
+**/target/
+node_modules/
+
+# Dev proving artifacts (INSECURE single-party setup; regenerate with scripts/dev-setup.sh)
+artifacts/
+
+# Keypairs and secrets: never commit.
+*.keypair.json
+**/keys/*.json
+**/deploy/*-keypair.json
+id.json
+.env
+test-ledger/
+
+# Noir
+circuits/**/Prover.toml
+!circuits/**/Prover.example.toml

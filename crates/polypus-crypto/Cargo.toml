@@ -1,0 +1,28 @@
+[package]
+name = "polypus-crypto"
+description = "Polypus native reference implementation (UNAUDITED): keys, notes, nullifiers, Merkle tree, kernel relation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ark-bn254.workspace = true
+ark-ff.workspace = true
+light-poseidon.workspace = true
+sha2.workspace = true
+curve25519-dalek.workspace = true
+bech32.workspace = true
+bs58.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[[bin]]
+name = "gen-vectors"
+path = "src/bin/gen_vectors.rs"

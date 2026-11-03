@@ -1,0 +1,83 @@
+[
+  {
+    "addresses": [
+      {
+        "diversifier": "c7f99e3aa9cc29c15161b7",
+        "diversifier_field": "0x000000000000000000000000000000000000000000c7f99e3aa9cc29c15161b7",
+        "encoded": "poly1q8rln83648xzns23vxms90m53dlr07dthdeuctlfvy0fn6huhc58ee5t4erm7cf9r3knvqsxxmymqzunyf5t28636nv3e7eh7fw9scec6pxwcacz869hh9e8jygl4lkl",
+        "index": 0,
+        "owner": "0x0636c9b00b932268b51f51d4d91cfb37f25c586338d04cec77023e8b7b972791",
+        "pk_d": "02bf748b7e37f9abbb73cc2fe9611e99eafcbe287ce68bae47bf61251c6d3602"
+      },
+      {
+        "diversifier": "7f8d93c26d0efa8bcd99b2",
+        "diversifier_field": "0x0000000000000000000000000000000000000000007f8d93c26d0efa8bcd99b2",
+        "encoded": "poly1q9lcmy7zd5804z7dnxe830gk4feuva8hlg9ntcl6fyj6eut9c5eerx5akzrjvwwkehaxkmsm6c8cvl3200yaul6xvtuazy0l2vg7vx86zd2c7kjwwq73lvdwkvz432a3",
+        "index": 1,
+        "owner": "0x1bd60f867e2a7bc9de7f4662f9d111ff5311e618fa13558f5a4e703d1fb1aeb3",
+        "pk_d": "78bd16aa73c674f7fa0b35e3fa4925acf165c533919a9db0872639d6cdfa6b6e"
+      }
+    ],
+    "ak": "0x2dc5be454a56763e51de9fbf90a765245eaf8004d1adb63761c4660b707eae3b",
+    "ask": "0x1faecdc4f3b6458cc39e532c5af0ab0d9ce7fd328d73159542a592866d07e929",
+    "fvk_encoded": "polyview1qykut0j9fft8v0j3m60mly98v5j9atuqqng6md3hv8zxvzms06hrktz5z5hsz00fdhqm7vuvc0w7gq4294ax2psp0xd5yfxxpne9hpczaa6343d8qncyht6vu2exvec7ezn50c7g7dy2pttx26m85wk65plsvtn7dh",
+    "ivk": "ef751ac5a704f04baf4ce2b266671ec8a747e3c8f348a0ad6656b67a3adaa07f",
+    "ivk_encoded": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+    "nk": "0x2c54152f013de96dc1bf338cc3dde402aa2d7a650601799b4224c60cf25b8702",
+    "seed": "0101010101010101010101010101010101010101010101010101010101010101"
+  },
+  {
+    "addresses": [
+      {
+        "diversifier": "2499e0a7cdea025fde222d",
+        "diversifier_field": "0x0000000000000000000000000000000000000000002499e0a7cdea025fde222d",
+        "encoded": "poly1qyjfnc98eh4qyh77ygklqeey2cqz5r8wwq84h9ltjvxegemdljuvpzaey7lrfd2xsfwvsyc4ch6nrunx8zl353rqustqft246rl9w0g48vzprtkejxecftg3mc0ku0hq",
+        "index": 0,
+        "owner": "0x15c5f531f26638bf1a4460e41604ad55d0fe573d153b0411aed991b384ad11de",
+        "pk_d": "f0672456002a0cee700f5b97eb930d94676dfcb8c08bb927be34b546825cc813"
+      },
+      {
+        "diversifier": "f3a60a246c2db795350d74",
+        "diversifier_field": "0x000000000000000000000000000000000000000000f3a60a246c2db795350d74",
+        "encoded": "poly1q8e6vz3ydskm09f4p46tsxw3k6t7ze8z32pgy2zfar87zfw6lws84lhzq5nr3v855y62yje8trq6qx775n53c3lqwyrcsqcva2raws6mlcjpvevckdsczrpyf5s2umyr",
+        "index": 1,
+        "owner": "0x2758c1a01bdea4e91c47e0710788030cea87d7435bfe24166598b361810c244d",
+        "pk_d": "b819d1b697e164e28a82822849e8cfe125dafba07afee2052638b0f4a134a24b"
+      }
+    ],
+    "ak": "0x068de9a75fcd18c5427d61dc71117895785cb31b678c20856b82562ef7c81a9d",
+    "ask": "0x25edef2b11e2666e3f67f1fbafb8852b6f90f82db7e9c1301dd8365faa7dcf36",
+    "fvk_encoded": "polyview1qyrgm6d8tlx3332z04sacug30z2hsh9nrdnccgy9dwp9vthheqdf6qhx0d8vnapj2u2pvx0n4k473rapwldlr30e2vfpv2nhk4ukv8luvnp8ms5ylcqcvthf0aa5lxvt9puyyzl9w6ccm7ejx5p7595egduqqeqq99",
+    "ivk": "64c27dc284fe01862ee97f7b4f998b2878420be576b18dfb323503ea16994378",
+    "ivk_encoded": "polyivk1q9jvylwzsnlqrp3wa9lhknue3v58ssstu4mtrr0mxg6s86skn9phsamrvar",
+    "nk": "0x02e67b4ec9f43257141619f3adabe88fa177dbf1c5f95312162a77b579661ffc",
+    "seed": "0202020202020202020202020202020202020202020202020202020202020202"
+  },
+  {
+    "addresses": [
+      {
+        "diversifier": "0f847b96f3c78c6ee3e5a0",
+        "diversifier_field": "0x0000000000000000000000000000000000000000000f847b96f3c78c6ee3e5a0",
+        "encoded": "poly1qy8cg7uk70rccmhruksyhvzn0wwerj89e8jshe3d2aytxh608hnerhf57wed5r7hy7s7kjc5kdsxp8dk5twmrxln9a097fmuetksjkhgwh2ysqnjmqcd6paevv3l03m2",
+        "index": 0,
+        "owner": "0x14b360609db6a2ddb19bf32f5e5f277ccaed095ae875d4480272d830dd07b963",
+        "pk_d": "4bb0537b9d91c8e5c9e50be62d5748b35f4f3de791dd34f3b2da0fd727a1eb4b"
+      },
+      {
+        "diversifier": "1b11d092136910cc08006d",
+        "diversifier_field": "0x0000000000000000000000000000000000000000001b11d092136910cc08006d",
+        "encoded": "poly1qyd3r5yjzd53pnqgqpkuhlh4net9f8k3nxgt7c6huuu9y3c569juqfjvgz8a4mlpxmqj27ephvksxv2lw5gvm4lfc27ysguddf3wptwcasj4kuv6sr0lj46knvp7f36y",
+        "index": 1,
+        "owner": "0x21bb2d03315f7510cdd7e9c2bc48238d6a62e0add8ec255b719a80dff957569b",
+        "pk_d": "cbfef59e56549ed19990bf6357e738524714d165c0264c408fdaefe136c1257b"
+      }
+    ],
+    "ak": "0x050101ed3504a6663087f48689fc823e7b501f2f3db88a25bc19fc6f81f801b0",
+    "ask": "0x170dd5f159e5dd9bccf58ba8fb1d09e7880d1dc4e3e933e5b472276a51666617",
+    "fvk_encoded": "polyview1qyzszq0dx5z2ve3ssl6gdz0usgl8k5ql9u7m3z39hsvlcmuplqqmqxzn70tpgr4akzard0dtcdfagtc6gscvjpfm5zherrdl55jzq79yent2p7ey3u5q7k0xlqz7haps026mfhl9pvvww42y5zlx6nad5k6qusx576",
+    "ivk": "ccd6a0fb248f280f59e6f805ebf4307ab5b4dfe50b18e75544a0be6d4fada5b4",
+    "ivk_encoded": "polyivk1q8xddg8myj8jsr6eumuqt6l5xpattdxlu5933e64gjstum204kjmg80apdk",
+    "nk": "0x1853f3d6140ebdb0ba36bdabc353d42f1a4430c9053ba0af918dbfa5242078a4",
+    "seed": "0303030303030303030303030303030303030303030303030303030303030303"
+  }
+]
