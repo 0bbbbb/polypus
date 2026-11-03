@@ -1,0 +1,66 @@
+# Benchmarks
+
+All numbers were measured on 2026-11-03, on one developer laptop: an AMD
+Ryzen 7 9850X3D (8 cores / 16 threads), 14 GB RAM, Linux 7.0, with the
+toolchain in ADR-0001. They are dev measurements, not security claims.
+Browser (SunspotJS) and mobile proving have **not** been measured yet
+(design Q6; still open for M1).
+
+## Kernel v1 circuit (2-in / 2-out, depth-26 tree)
+
+| Metric | Value | How measured |
+|---|---|---|
+| ACIR opcodes | 23,209 (+26 Brillig) | `nargo info --package kernel` |
+| **Groth16 constraints (gnark, after Sunspot)** | **40,710** | `sunspot compile` → `nbConstraints` |
+| Public inputs | 1 (`pi_hash`) | ADR-0004 |
+| Proof size | **388 bytes** (A, B, C + 1 BSB22 commitment + PoK) | `sunspot prove` output |
+| VK size | 1,040 bytes | `artifacts/dev/kernel.vk` |
+| Proving key size | 19.8 MB | `artifacts/dev/kernel.pk` |
+| Dev setup (`sunspot setup`, INSECURE) | 1.5 s, 99 MB RSS | `/usr/bin/time -v` |
+| Witness generation (`nargo execute`) | median 258 ms (min 247, max 299), n = 20 | `polypus-prove bench 20`; wall clock includes process start |
+| **Groth16 proving (`sunspot prove`)** | **median 434 ms** (min 395, max 467), n = 20; gnark prover itself ≈ 110 ms; ~140 MB RSS | same; the rest is process start + 20 MB key load |
+| Off-chain verify (`sunspot verify`) | < 10 ms | `polypus-prove scenarios` |
+
+### Where the constraints go
+
+Cost of each Poseidon arity after Sunspot, measured as a standalone circuit
+(includes ~1–2 constraints of harness):
+
+| Primitive | Constraints | Uses in the kernel | Subtotal |
+|---|---|---|---|
+| `H_2` (Merkle node, `ak`, `rcm`) | 558 | 52 Merkle + 1 `ak` + 4 `rcm` | ~31.8k |
+| `H_4` (owner, nullifier) | 689 | 2 + 2 | ~2.8k |
+| `H_7` (`program_io_hash`) | 882 | 1 | ~0.9k |
+| `H_8` (note commitment) | 930 | 4 | ~3.7k |
+| `H_11` (`pi_hash`) | 1,074 | 1 | ~1.1k |
+| 64-bit range check | ~35 | 4 (+1 at 65 bits) | ~0.2k |
+| 26-bit index decomposition | ~28 | 2 | ~0.1k |
+
+**The Merkle paths are ~71% of the circuit.** Ideas, none applied yet:
+- a shallower tree for devnet;
+- Merkle membership for dummies is computed but not enforced, so it is pure
+  overhead; a 1-in variant would remove it;
+- a cheaper in-circuit hash in the tree would break `sol_poseidon` parity, so
+  it is not an option while the tree is maintained on-chain.
+
+circomlib's `Poseidon(2)` is about 240 R1CS constraints, so Sunspot's
+ACIR→gnark lowering of the Noir Poseidon library is about 2.3× less dense.
+This is worth raising with Reilabs and comparing against the gnark fallback in
+M6.
+
+## Differential testing (Rust reference vs Noir circuit)
+
+`polypus-prove diff 10000 8 1000`: 10,000 random actions with 0–2 real
+inputs, random deposit/withdraw/fee and random output splits. Half are honest.
+The other half get one random mutation at one of 43 witness locations (±1,
++2^64, +2^26, a random field element, or zero), with derived public values
+recomputed half of the time.
+
+| Cases | Accepted by Rust | Rejected by Rust | Mismatches with Noir | Time (8 workers) |
+|---|---|---|---|---|
+| 10,000 | 6,553 | 3,447 | **0** | 498 s |
+
+## On-chain (Solana, LiteSVM / solana-test-validator)
+
+See the "Compute units" section of `programs/README.md`; the summary is
+appended below once measured.
