@@ -30,4 +30,18 @@ pub enum PoolError {
     TreeCorrupted,
     #[msg("token account must not be the vault")]
     VaultAsCounterparty,
+    #[msg("signer is not the program's upgrade authority")]
+    NotUpgradeAuthority,
+    #[msg("program_data is not this program's ProgramData account")]
+    WrongProgramData,
+    #[msg("signer is not the pool admin")]
+    NotAdmin,
+    #[msg("signer is not the pool guardian")]
+    NotGuardian,
+    #[msg("pool is paused: deposit and transact are disabled, withdraw is allowed")]
+    PoolPaused,
+    #[msg("deposit ext_amount exceeds the pool's max_deposit")]
+    DepositTooLarge,
+    #[msg("deposit would push the vault balance above the pool's tvl_cap")]
+    TvlCapExceeded,
 }

@@ -32,4 +32,4 @@ solana --url http://127.0.0.1:8899 airdrop 100 "$work/deployer.json" >/dev/null
 solana --url http://127.0.0.1:8899 program deploy --keypair "$work/deployer.json" \
   --buffer "$work/buffer.json" --program-id "$program_kp" programs/target/deploy/polypus_pool.so
 
-POLYPUS_RPC=http://127.0.0.1:8899 programs/target/release/localnet-e2e
+POLYPUS_RPC=http://127.0.0.1:8899 POLYPUS_ADMIN_KEYPAIR="$work/deployer.json" programs/target/release/localnet-e2e

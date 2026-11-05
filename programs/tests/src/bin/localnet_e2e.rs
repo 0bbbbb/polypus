@@ -14,7 +14,10 @@ use polypus_crypto::keys::SpendingKey;
 use polypus_crypto::note::Note;
 use polypus_crypto::scenarios::Ledger;
 use polypus_prover::Toolchain;
-use polypus_tests::{compute_budget_ix, disc, legacy_tx_size, pool_program, sha256, token_program, Kind, TransactArgs};
+use polypus_tests::{
+    compute_budget_ix, disc, init_pool_ix, legacy_tx_size, pool_program, sha256, token_program, Kind, PoolConfig,
+    TransactArgs,
+};
 use solana_address::Address;
 use solana_commitment_config::CommitmentConfig;
 use solana_instruction::{AccountMeta, Instruction};
@@ -191,22 +194,11 @@ fn main() {
         relayer_token: rel_kp.pubkey(),
     };
     let chain_domain = sha256(format!("polypus.localnet.{genesis}").as_bytes());
-    let mut data = disc("global", "init_pool").to_vec();
-    data.extend_from_slice(&chain_domain);
-    let init = Instruction {
-        program_id: pool_program(),
-        accounts: vec![
-            AccountMeta::new(p, true),
-            AccountMeta::new_readonly(acc.mint, false),
-            AccountMeta::new(acc.pool, false),
-            AccountMeta::new(acc.tree, false),
-            AccountMeta::new(acc.vault, false),
-            AccountMeta::new_readonly(token_program(), false),
-            AccountMeta::new_readonly(SYSTEM, false),
-        ],
-        data,
-    };
-    let (sig, cu) = net.send(&[init], &[&net.payer]).expect("init_pool");
+    // init_pool is gated on the program's upgrade authority (the deployer).
+    let admin_path = std::env::var("POLYPUS_ADMIN_KEYPAIR").expect("POLYPUS_ADMIN_KEYPAIR (upgrade authority keypair file)");
+    let admin = read_keypair(&admin_path);
+    let init = init_pool_ix(&admin.pubkey(), &acc.mint, chain_domain, PoolConfig::unlimited(admin.pubkey()));
+    let (sig, cu) = net.send(&[init], &[&admin]).expect("init_pool");
     println!("init_pool                    CU {cu:>7}  sig {sig}");
     let mut net = net;
     net.cu.push(("init_pool".into(), cu, 0));
@@ -289,6 +281,11 @@ fn main() {
 
 fn l_note(l: &mut Ledger, amount: u64, owner: polypus_crypto::Fr) -> Note {
     l.note(amount, owner)
+}
+
+fn read_keypair(path: &str) -> Keypair {
+    let bytes: Vec<u8> = serde_json::from_str(&std::fs::read_to_string(path).expect("read keypair")).expect("keypair json");
+    Keypair::try_from(bytes.as_slice()).expect("keypair bytes")
 }
 
 fn rand_seed() -> [u8; 32] {

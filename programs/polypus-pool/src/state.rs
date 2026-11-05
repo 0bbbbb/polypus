@@ -25,6 +25,15 @@ pub struct Pool {
     pub bump: u8,
     pub tree_bump: u8,
     pub vault_bump: u8,
+    /// May pause/unpause `deposit` and `transact` (`set_paused`). Set by the admin.
+    pub guardian: Pubkey,
+    /// When true, `deposit` and `transact` fail with `PoolPaused`. `withdraw`
+    /// is never paused, so users can always exit (design §8.2).
+    pub paused: bool,
+    /// Largest `ext_amount` a single deposit may have (base units).
+    pub max_deposit: u64,
+    /// Largest vault balance a deposit may leave behind (base units).
+    pub tvl_cap: u64,
 }
 
 /// Commitment tree (zero-copy), PDA `["tree", pool]`. See `merkle.rs`.

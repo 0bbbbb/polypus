@@ -34,10 +34,95 @@ use solana_transaction::Transaction;
 
 pub use litesvm;
 
-pub const POOL_PROGRAM_ID: &str = "PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu";
+pub const POOL_PROGRAM_ID: &str = "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj";
 pub const TOKEN_PROGRAM_ID: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 pub const SYSTEM_PROGRAM_ID: &str = "11111111111111111111111111111111";
 pub const COMPUTE_BUDGET_ID: &str = "ComputeBudget111111111111111111111111111111";
+pub const BPF_LOADER_UPGRADEABLE_ID: &str = "BPFLoaderUpgradeab1e11111111111111111111111";
+
+/// The pool program's ProgramData account (loader-v3 PDA `[program_id]`).
+pub fn program_data_address(program: &Address) -> Address {
+    Address::find_program_address(&[program.as_ref()], &addr(BPF_LOADER_UPGRADEABLE_ID)).0
+}
+
+/// Pool configuration passed to `init_pool` (after `chain_domain`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PoolConfig {
+    pub guardian: Address,
+    pub max_deposit: u64,
+    pub tvl_cap: u64,
+}
+
+impl PoolConfig {
+    pub fn unlimited(guardian: Address) -> Self {
+        PoolConfig { guardian, max_deposit: u64::MAX, tvl_cap: u64::MAX }
+    }
+}
+
+/// `init_pool` instruction for `mint` (accounts in program order).
+pub fn init_pool_ix(admin: &Address, mint: &Address, chain_domain: [u8; 32], cfg: PoolConfig) -> Instruction {
+    let program = pool_program();
+    let pool = Address::find_program_address(&[b"pool", mint.as_ref()], &program).0;
+    let mut data = disc("global", "init_pool").to_vec();
+    data.extend_from_slice(&chain_domain);
+    data.extend_from_slice(cfg.guardian.as_ref());
+    data.extend_from_slice(&cfg.max_deposit.to_le_bytes());
+    data.extend_from_slice(&cfg.tvl_cap.to_le_bytes());
+    Instruction {
+        program_id: program,
+        accounts: vec![
+            AccountMeta::new(*admin, true),
+            AccountMeta::new_readonly(*mint, false),
+            AccountMeta::new(pool, false),
+            AccountMeta::new(Address::find_program_address(&[b"tree", pool.as_ref()], &program).0, false),
+            AccountMeta::new(Address::find_program_address(&[b"vault", pool.as_ref()], &program).0, false),
+            AccountMeta::new_readonly(token_program(), false),
+            AccountMeta::new_readonly(addr(SYSTEM_PROGRAM_ID), false),
+            AccountMeta::new_readonly(program, false),
+            AccountMeta::new_readonly(program_data_address(&program), false),
+        ],
+        data,
+    }
+}
+
+/// `set_paused` (signer = guardian), `set_guardian` / `set_limits` (signer = admin).
+pub fn set_paused_ix(guardian: &Address, pool: &Address, paused: bool) -> Instruction {
+    let mut data = disc("global", "set_paused").to_vec();
+    data.push(paused as u8);
+    Instruction {
+        program_id: pool_program(),
+        accounts: vec![AccountMeta::new_readonly(*guardian, true), AccountMeta::new(*pool, false)],
+        data,
+    }
+}
+
+pub fn set_guardian_ix(admin: &Address, pool: &Address, guardian: &Address) -> Instruction {
+    let mut data = disc("global", "set_guardian").to_vec();
+    data.extend_from_slice(guardian.as_ref());
+    Instruction {
+        program_id: pool_program(),
+        accounts: vec![AccountMeta::new_readonly(*admin, true), AccountMeta::new(*pool, false)],
+        data,
+    }
+}
+
+pub fn set_limits_ix(admin: &Address, pool: &Address, max_deposit: u64, tvl_cap: u64) -> Instruction {
+    let mut data = disc("global", "set_limits").to_vec();
+    data.extend_from_slice(&max_deposit.to_le_bytes());
+    data.extend_from_slice(&tvl_cap.to_le_bytes());
+    Instruction {
+        program_id: pool_program(),
+        accounts: vec![AccountMeta::new_readonly(*admin, true), AccountMeta::new(*pool, false)],
+        data,
+    }
+}
+
+/// Byte offsets of the fields appended to `Pool` by the hardening change
+/// (after the 8-byte discriminator): guardian, paused, max_deposit, tvl_cap.
+pub const POOL_GUARDIAN_OFFSET: usize = 8 + 32 * 6 + 3;
+pub const POOL_PAUSED_OFFSET: usize = POOL_GUARDIAN_OFFSET + 32;
+pub const POOL_MAX_DEPOSIT_OFFSET: usize = POOL_PAUSED_OFFSET + 1;
+pub const POOL_TVL_CAP_OFFSET: usize = POOL_MAX_DEPOSIT_OFFSET + 8;
 
 pub fn addr(s: &str) -> Address {
     Address::from_str(s).unwrap()
@@ -351,7 +436,9 @@ pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
 /// the [`Fixed`] mint.
 pub struct Env {
     pub svm: LiteSVM,
+    /// Upgrade authority of the loaded pool program, and pool admin.
     pub admin: Keypair,
+    pub guardian: Keypair,
     pub depositor: Keypair,
     pub relayer: Keypair,
     pub init_cu: u64,
@@ -372,11 +459,13 @@ impl Env {
         svm.add_program_from_file(pool_program(), pool_so())
             .expect("load polypus_pool.so (run cargo build-sbf first)");
         let admin = Keypair::new();
+        let guardian = Keypair::new();
         let depositor = Keypair::new();
         let relayer = Keypair::new();
-        for k in [&admin, &depositor, &relayer] {
+        for k in [&admin, &guardian, &depositor, &relayer] {
             svm.airdrop(&k.pubkey(), 100_000_000_000).unwrap();
         }
+        set_upgrade_authority(&mut svm, Some(&admin.pubkey()));
         let mint = Fixed::mint();
         let tp = token_program();
         let rent = |svm: &LiteSVM, n| svm.minimum_balance_for_rent_exemption(n);
@@ -395,7 +484,7 @@ impl Env {
         let rel = acct(&svm, pack_token_account(&mint, &relayer.pubkey(), 0));
         svm.set_account(Fixed::relayer_token(), rel).unwrap();
 
-        let mut env = Env { svm, admin, depositor, relayer, init_cu: 0, vk_sha256: None };
+        let mut env = Env { svm, admin, guardian, depositor, relayer, init_cu: 0, vk_sha256: None };
         if init {
             let meta = env.init_pool(Fixed::chain_domain()).expect("init_pool");
             env.init_cu = meta.compute_units_consumed;
@@ -406,28 +495,37 @@ impl Env {
         env
     }
 
+    pub fn default_config(&self) -> PoolConfig {
+        PoolConfig::unlimited(self.guardian.pubkey())
+    }
+
     pub fn init_pool_ix(&self, chain_domain: [u8; 32]) -> Instruction {
-        let mut data = disc("global", "init_pool").to_vec();
-        data.extend_from_slice(&chain_domain);
-        Instruction {
-            program_id: pool_program(),
-            accounts: vec![
-                AccountMeta::new(self.admin.pubkey(), true),
-                AccountMeta::new_readonly(Fixed::mint(), false),
-                AccountMeta::new(Fixed::pool(), false),
-                AccountMeta::new(Fixed::tree(), false),
-                AccountMeta::new(Fixed::vault(), false),
-                AccountMeta::new_readonly(token_program(), false),
-                AccountMeta::new_readonly(addr(SYSTEM_PROGRAM_ID), false),
-            ],
-            data,
-        }
+        init_pool_ix(&self.admin.pubkey(), &Fixed::mint(), chain_domain, self.default_config())
     }
 
     pub fn init_pool(&mut self, chain_domain: [u8; 32]) -> TxResult {
         let ix = self.init_pool_ix(chain_domain);
         let admin = self.admin.insecure_clone();
         self.send(&[ix], &admin)
+    }
+
+    pub fn set_paused(&mut self, signer: &Keypair, paused: bool) -> TxResult {
+        let ix = set_paused_ix(&signer.pubkey(), &Fixed::pool(), paused);
+        self.send(&[ix], signer)
+    }
+
+    pub fn set_guardian(&mut self, signer: &Keypair, guardian: &Address) -> TxResult {
+        let ix = set_guardian_ix(&signer.pubkey(), &Fixed::pool(), guardian);
+        self.send(&[ix], signer)
+    }
+
+    pub fn set_limits(&mut self, signer: &Keypair, max_deposit: u64, tvl_cap: u64) -> TxResult {
+        let ix = set_limits_ix(&signer.pubkey(), &Fixed::pool(), max_deposit, tvl_cap);
+        self.send(&[ix], signer)
+    }
+
+    pub fn pool_data(&self) -> Vec<u8> {
+        self.svm.get_account(&Fixed::pool()).expect("pool").data
     }
 
     /// Build a pool action instruction. `signer` is the depositor (deposit)
@@ -511,6 +609,27 @@ impl Default for Env {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Rewrite the upgrade authority in the pool program's ProgramData account.
+/// LiteSVM deploys with the upgradeable loader but no authority; the metadata
+/// is bincode `ProgramData { slot: u64, upgrade_authority_address: Option<Pubkey> }`
+/// after a u32 enum tag (45 bytes).
+pub fn set_upgrade_authority(svm: &mut LiteSVM, authority: Option<&Address>) {
+    let pd = program_data_address(&pool_program());
+    let mut acc = svm.get_account(&pd).expect("pool program must be loaded with the upgradeable loader");
+    assert_eq!(u32::from_le_bytes(acc.data[0..4].try_into().unwrap()), 3, "ProgramData tag");
+    match authority {
+        Some(a) => {
+            acc.data[12] = 1;
+            acc.data[13..45].copy_from_slice(a.as_ref());
+        }
+        None => {
+            acc.data[12] = 0;
+            acc.data[13..45].fill(0);
+        }
+    }
+    svm.set_account(pd, acc).unwrap();
 }
 
 /// Byte offsets inside the Tree account (8-byte discriminator first).

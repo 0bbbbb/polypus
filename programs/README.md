@@ -12,11 +12,11 @@ share a lockfile with the host-only crates in `../crates`.
 | Crate | What |
 |---|---|
 | `polypus-verifier/` | Groth16 verifier for gnark/Sunspot proofs, including BSB22 commitments, using the alt_bn128 syscalls. Vendored from Reilabs' Apache-2.0 [`gnark-verifier-solana`](https://github.com/reilabs/sunspot/tree/main/gnark-solana/crates/verifier-lib) (commit `0a9f7d0`). See `NOTICE` for the modifications (hardening plus CU optimizations). |
-| `polypus-pool/` | Anchor 1.2.2 program: `init_pool`, `deposit`, `transact`, `withdraw`. |
+| `polypus-pool/` | Anchor 1.2.2 program: `init_pool` (upgrade authority only), `deposit`, `transact`, `withdraw`, and the admin/guardian instructions `set_paused`, `set_guardian`, `set_limits`. |
 | `verifier-bench/` | **Test-only** SBF program, never deployed. It measures the verifier, `sol_poseidon` and the tree append in isolation. |
 | `tests/` | LiteSVM host tests (load `target/deploy/*.so`), plus fixtures. |
 
-Program id: `PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu`. The keypair is in
+Program id: `PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj`. The keypair is in
 `keys/polypus_pool-keypair.json` and `target/deploy/` (both gitignored). Never commit keypairs.
 
 ## Versions
@@ -153,7 +153,7 @@ pipeline with `nargo` + `sunspot`.
 
 | Operation | CU |
 |---|---|
-| `init_pool` (3 PDAs, incl. on-chain `asset_id` = H_3) | 31,278 |
+| `init_pool` (3 PDAs, incl. on-chain `asset_id` = H_3, ProgramData check) | 29,885 |
 | `sol_poseidon` H_2 / H_3 / H_11 / H_12 (incl. wrapper) | 1,097 / 1,415 / 8,351 / 9,767 |
 | Tree append of one pair (26 × H_2) | 24,295 |
 | Verifier, 1 public input, 0 commitments (smoke test) | 78,677 (upstream code: 161,177) |
@@ -189,7 +189,8 @@ The checks run in this order, and each one fails the whole transaction:
    created with `init`, so creation fails if either already exists. This is the
    double-spend guard. Nothing is keyed on proof bytes.
 2. `ext_amount` has the right sign for the instruction (deposit > 0, transact = 0,
-   withdraw < 0); `|ext_amount| < 2^62`; `fee < 2^62`.
+   withdraw < 0). Deposit and transact: the pool is not paused. Deposit:
+   `max_deposit` and `tvl_cap`. Then `|ext_amount| < 2^62`; `fee < 2^62`.
 3. A relayer token account is present iff `fee > 0`. Neither counterparty account may be
    the vault.
 4. `Clock.slot ≥ not_before_slot`.
@@ -207,17 +208,39 @@ The checks run in this order, and each one fails the whole transaction:
     token transfers run (deposit: depositor to vault; withdraw: vault to
     `public_account`; fee: vault to `relayer_token`).
 
+## Access control and limits
+
+| Instruction | Signer | Effect |
+|---|---|---|
+| `init_pool(chain_domain, guardian, max_deposit, tvl_cap)` | program **upgrade authority** (becomes `admin`) | creates pool, tree, vault. Accounts: admin, mint, pool, tree, vault, token program, system program, **program, program_data** |
+| `set_paused(bool)` | `guardian` | pauses / unpauses `deposit` and `transact` |
+| `set_guardian(pubkey)` | `admin` | replaces the guardian |
+| `set_limits(max_deposit, tvl_cap)` | `admin` | deposit limits, base units; `u64::MAX` = unlimited |
+
+- Paused: `deposit` and `transact` fail with `PoolPaused`. **`withdraw` is never
+  paused**, so users can always exit (design §8.2). See ADR-0006 decision 8.
+- `deposit` fails with `DepositTooLarge` if `ext_amount > max_deposit`, and
+  with `TvlCapExceeded` if `vault + ext_amount − fee > tvl_cap`. Both checks run
+  before any proof work. Transact and withdraw are not capped.
+- Errors: `NotUpgradeAuthority`, `WrongProgramData`, `NotAdmin`, `NotGuardian`,
+  `PoolPaused`, `DepositTooLarge`, `TvlCapExceeded` (appended to `PoolError`,
+  so earlier error codes did not change).
+- Tests: `tests/tests/admin.rs` has a negative test for every check
+  (non-authority init, immutable program, foreign ProgramData, non-guardian
+  pause, non-admin `set_guardian`/`set_limits`, pause vs. each action, both
+  caps at and just over the limit, including the fee case).
+
 ## Known limitations (M2)
 
-- `init_pool` is permissionless: anyone can create the pool for a mint first,
-  choosing its `admin` and `chain_domain`. Gate it on the upgrade authority before
-  any shared devnet deployment.
-- There is no pause flag or deposit cap yet, so the design doc's guardian is missing.
-  Only classic SPL Token mints are supported. The mint's freeze authority could
+- No per-epoch withdrawal rate limit and no two-step admin transfer. A
+  soundness bug that inflates notes can still drain the vault through
+  `withdraw` while the pool is paused; the TVL cap bounds the loss.
+- Only classic SPL Token mints are supported. The mint's freeze authority could
   freeze the vault.
 - `program_id` / `program_io_hash` are fixed to 0. They are not instruction
   inputs, so locked notes (K10) cannot be spent until M3.
-- With real ciphertexts, legacy transactions exceed 1,232 B (see above).
+- With real ciphertexts, legacy transactions exceed 1,232 B; clients use v0
+  transactions with an address lookup table (see `docs/benchmarks.md`).
 - Kernel proof points are validated only by the alt_bn128 syscalls (on-curve
   checks, and whatever subgroup checks the pairing syscall performs). This
   should be reviewed together with the vendored verifier.

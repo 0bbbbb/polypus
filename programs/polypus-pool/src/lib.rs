@@ -26,7 +26,7 @@ use crate::{
     state::*,
 };
 
-declare_id!("PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu");
+declare_id!("PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj");
 
 /// Arguments shared by `deposit`, `transact` and `withdraw`.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
@@ -67,9 +67,16 @@ pub struct ActionEvent {
 pub mod polypus_pool {
     use super::*;
 
-    /// Create the pool, its tree and its vault for `mint`. `chain_domain` is
-    /// the per-cluster constant bound into every ext_data_hash.
-    pub fn init_pool(ctx: Context<InitPool>, chain_domain: [u8; 32]) -> Result<()> {
+    /// Create the pool, its tree and its vault for `mint`. Only the program's
+    /// upgrade authority may call it; it becomes the pool admin. `chain_domain`
+    /// is the per-cluster constant bound into every ext_data_hash.
+    pub fn init_pool(
+        ctx: Context<InitPool>,
+        chain_domain: [u8; 32],
+        guardian: Pubkey,
+        max_deposit: u64,
+        tvl_cap: u64,
+    ) -> Result<()> {
         let a = &mut *ctx.accounts;
         let pool_key = a.pool.key();
         let pool = &mut a.pool;
@@ -82,8 +89,36 @@ pub mod polypus_pool {
         pool.bump = ctx.bumps.pool;
         pool.tree_bump = ctx.bumps.tree;
         pool.vault_bump = ctx.bumps.vault;
+        pool.guardian = guardian;
+        pool.paused = false;
+        pool.max_deposit = max_deposit;
+        pool.tvl_cap = tvl_cap;
         a.tree.load_init()?.init(pool_key);
         msg!("kernel vk sha256 = {}", hex(&kernel_vk::VK_SHA256));
+        Ok(())
+    }
+
+    /// Guardian only. Pausing stops `deposit` and `transact`; `withdraw`
+    /// always stays available so funds can leave the pool.
+    pub fn set_paused(ctx: Context<GuardianOnly>, paused: bool) -> Result<()> {
+        ctx.accounts.pool.paused = paused;
+        msg!("pool paused = {}", paused);
+        Ok(())
+    }
+
+    /// Admin only.
+    pub fn set_guardian(ctx: Context<AdminOnly>, guardian: Pubkey) -> Result<()> {
+        ctx.accounts.pool.guardian = guardian;
+        msg!("pool guardian = {}", guardian);
+        Ok(())
+    }
+
+    /// Admin only. Limits apply to deposits only (base units).
+    pub fn set_limits(ctx: Context<AdminOnly>, max_deposit: u64, tvl_cap: u64) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        pool.max_deposit = max_deposit;
+        pool.tvl_cap = tvl_cap;
+        msg!("pool limits: max_deposit = {}, tvl_cap = {}", max_deposit, tvl_cap);
         Ok(())
     }
 
@@ -91,7 +126,13 @@ pub mod polypus_pool {
     pub fn deposit(ctx: Context<Deposit>, args: ActionArgs) -> Result<()> {
         require!(args.ext_amount > 0, PoolError::WrongExtAmountSign);
         let a = &*ctx.accounts;
+        require!(!a.pool.paused, PoolError::PoolPaused);
         let (amount, fee) = (args.ext_amount as u64, args.fee);
+        require!(amount <= a.pool.max_deposit, PoolError::DepositTooLarge);
+        // The fee leaves the vault in the same instruction, so the balance
+        // after the action is vault + ext_amount − fee.
+        let vault_after = a.vault.amount as i128 + amount as i128 - fee as i128;
+        require!(vault_after <= a.pool.tvl_cap as i128, PoolError::TvlCapExceeded);
         process_action(
             &a.pool,
             &a.tree,
@@ -120,6 +161,7 @@ pub mod polypus_pool {
     pub fn transact(ctx: Context<Transact>, args: ActionArgs) -> Result<()> {
         require!(args.ext_amount == 0, PoolError::WrongExtAmountSign);
         let a = &*ctx.accounts;
+        require!(!a.pool.paused, PoolError::PoolPaused);
         let fee = args.fee;
         process_action(
             &a.pool,
@@ -135,6 +177,7 @@ pub mod polypus_pool {
     }
 
     /// Unshield: send `|ext_amount|` (ext_amount < 0) from the vault to `public_account`.
+    /// Deliberately not gated on `paused`.
     pub fn withdraw(ctx: Context<Withdraw>, args: ActionArgs) -> Result<()> {
         require!(args.ext_amount < 0, PoolError::WrongExtAmountSign);
         let a = &*ctx.accounts;
@@ -328,6 +371,24 @@ pub struct InitPool<'info> {
     pub vault: Box<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ PoolError::WrongProgramData)]
+    pub program: Program<'info, crate::program::PolypusPool>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(admin.key()) @ PoolError::NotUpgradeAuthority)]
+    pub program_data: Box<Account<'info, ProgramData>>,
+}
+
+#[derive(Accounts)]
+pub struct GuardianOnly<'info> {
+    pub guardian: Signer<'info>,
+    #[account(mut, has_one = guardian @ PoolError::NotGuardian)]
+    pub pool: Box<Account<'info, Pool>>,
+}
+
+#[derive(Accounts)]
+pub struct AdminOnly<'info> {
+    pub admin: Signer<'info>,
+    #[account(mut, has_one = admin @ PoolError::NotAdmin)]
+    pub pool: Box<Account<'info, Pool>>,
 }
 
 #[derive(Accounts)]

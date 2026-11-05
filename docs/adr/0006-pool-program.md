@@ -41,20 +41,53 @@
    Each instruction fixes the sign of `ext_amount` and its account set. A
    relayer token account must be present **iff** `fee > 0`. `program_id` and
    `program_io_hash` are hard-coded to 0, because program actions are M3.
-7. **Program id** `PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu`. The doc asked
-   for a `PoLY…` vanity id, which the grind did not find in 12 minutes; `PoLy`
-   was found instantly. The keypair is git-ignored. A shared devnet
-   deployment should grind a proper `PoLY` id and hold the upgrade authority
-   in a multisig.
+7. **Program id** `PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj` (ground in
+   about 6 minutes on 8 threads, 2026-11-05; the earlier
+   `PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu` is retired). The keypair is
+   git-ignored. A shared deployment should hold the upgrade authority in a
+   multisig.
+8. **Access control (2026-11-05).**
+   - `init_pool` requires the signer to be the program's **upgrade
+     authority**. The instruction takes the program account and its
+     ProgramData account; the pool checks that the program account points to
+     that ProgramData, and that `upgrade_authority_address == Some(signer)`.
+     The signer becomes `admin`. An immutable program (no authority) cannot
+     create pools. The LiteSVM tests patch the authority into the
+     ProgramData that LiteSVM creates, so no test-only feature flag exists.
+   - `Pool` gained `guardian`, `paused`, `max_deposit`, `tvl_cap`, appended
+     after the existing fields. `set_paused(bool)` is guardian-only;
+     `set_guardian` and `set_limits(max_deposit, tvl_cap)` are admin-only.
+     There is no admin transfer instruction yet.
+   - **When paused, `deposit` and `transact` fail with `PoolPaused`;
+     `withdraw` is never paused.** Users can always exit (design §8.2: a
+     guardian may pause deposits, "never withdrawals of plain notes"). Pausing
+     `transact` too stops value moving between notes inside the pool while an
+     incident is investigated. The cost is that a user who must merge notes
+     before withdrawing can still do it, because a withdraw takes two inputs
+     and returns change. A soundness bug that inflates notes can still drain
+     the vault through `withdraw` while paused; the caps bound how much is in
+     the vault, not how fast it leaves. A per-epoch withdrawal rate limit
+     (design §8.2 item 6) is still missing.
+   - Deposit limits: `ext_amount ≤ max_deposit` (`DepositTooLarge`) and
+     `vault.amount + ext_amount − fee ≤ tvl_cap` (`TvlCapExceeded`). They are
+     checked before any proof work. `u64::MAX` means unlimited.
+9. **PDA bumps are not passed as instruction data.** The variance comes from
+   `find_program_address` for the two nullifier PDAs. Anchor's `init` with an
+   explicit `bump = …` still runs `find_program_address`, to enforce the
+   canonical bump. The canonical bump has to be enforced: a nullifier PDA at
+   a non-canonical bump is a different address, so `init` would succeed
+   there and the same nullifier could be spent twice. Proving a client-given
+   bump canonical takes the same search, so this would save nothing safely.
+   The pool, tree and vault are already checked by stored address
+   (`address = pool.tree`, …), not by seeds.
 
 ## Known gaps (must close before a shared devnet pool)
 
-- `init_pool` is permissionless: the first caller picks `admin` and
-  `chain_domain`. Gate it on the program upgrade authority.
-- There is no guardian pause and no deposit cap (design §8.2).
+- ~~`init_pool` is permissionless~~ — closed (decision 8).
+- ~~No guardian pause and no deposit cap~~ — closed (decision 8). Still
+  missing: per-epoch withdrawal rate limits and a two-step admin transfer.
 - Proof points are validated only by the alt_bn128 syscalls. Subgroup checks
   for G2 inputs need review together with the vendored verifier.
 - Legacy transactions are 1,085–1,154 B with test ciphertexts. Real
-  ciphertexts need v0 + lookup tables, or v1 transactions.
-- CU variance comes from the on-chain PDA bump search; pass the bumps as
-  instruction data.
+  ciphertexts need v0 + lookup tables (see `docs/benchmarks.md`).
+- CU variance from the nullifier PDA bump search stays (decision 9).

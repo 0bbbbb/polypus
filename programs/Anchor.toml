@@ -7,10 +7,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-polypus_pool = "PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu"
+polypus_pool = "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj"
 
 [programs.devnet]
-polypus_pool = "PoLyMJzp2sUxqEguNkpK5nvtJJna2UECSod7q9UWCVu"
+polypus_pool = "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj"
 
 [workspace]
 members = ["polypus-pool"]
