@@ -12,6 +12,7 @@ pub mod kernel;
 pub mod keys;
 pub mod merkle;
 pub mod note;
+pub mod note_encryption;
 pub mod scenarios;
 
 pub use field::Fr;

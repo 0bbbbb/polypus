@@ -1,0 +1,165 @@
+{
+  "ciphertext_len": 132,
+  "memo_len": 32,
+  "negative": {
+    "asset_id": "0x221dca7dc13ff865aeba26a6279adbdfe4f67fff7e2b2229013c0dfd8e2e29cb",
+    "cases": [
+      {
+        "ciphertext": "ed4d7ea05a0d2523509194eb2cffe85343d1283d7620d94388301bd03ce5a926dc2dff09a1a6a430f51e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089ad",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "flipped epk byte"
+      },
+      {
+        "ciphertext": "ec4d7ea05a0d2523509194eb2cffe85343d1283d7620d94388301bd03ce5a926dc2dff09a1a6a430f41e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089ad",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "flipped body byte"
+      },
+      {
+        "ciphertext": "ec4d7ea05a0d2523509194eb2cffe85343d1283d7620d94388301bd03ce5a926dc2dff09a1a6a430f51e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089ac",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "flipped tag byte"
+      },
+      {
+        "ciphertext": "ec4d7ea05a0d2523509194eb2cffe85343d1283d7620d94388301bd03ce5a926dc2dff09a1a6a430f51e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "truncated"
+      },
+      {
+        "ciphertext": "ec4d7ea05a0d2523509194eb2cffe85343d1283d7620d94388301bd03ce5a926dc2dff09a1a6a430f51e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089ad",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q9jvylwzsnlqrp3wa9lhknue3v58ssstu4mtrr0mxg6s86skn9phsamrvar",
+        "name": "wrong ivk"
+      },
+      {
+        "ciphertext": "0000000000000000000000000000000000000000000000000000000000000000dc2dff09a1a6a430f51e29cc0e6fa80dc5de72cc11dc17de72f705eaf6301b295af217d3bd0be1314e85d6429095a111101acd7de2acdb4ad211f59a638557de69fe67e5610e73ffd38f00e31af6dd497125400df1b980de5d9f79f0dbc273417e7089ad",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "all-zero epk (low order)"
+      },
+      {
+        "ciphertext": "cef0b8dde336b15331f050ca6020623ed2bf8a513a5d4c6036ab82b62367b912d4761edb9ca2c86cd1ad7b8a335c52b902aa599154268ed5c1d34afdbeee662d1d7fde1e597ba9cde6f433b943d67c4aefeaa449713427c2ba80c31cedfb8e669a71e40c44b08c477bdce42fd61db6ea4f47c87c2f81c6202359f9d90a8b465053d09df4",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "plaintext version 2"
+      },
+      {
+        "ciphertext": "13c9e05002178d745be936a192c88c9f7089a7002f9c5296c934153c50c7066d9249cea15cfe8a9991fd7b99abcc99d2eb58da5a33af2597ab17796471ab53c463d07fb1cd20dcb195ee438a232faa76ef2fd608d7e07fd2c6638603b5107c6b8b958c7c5772d9a7bac9b4ea9b4e958dca3b05d45ab96778da04ea7d3d777a9e0a94cae7",
+        "expect": "not_for_us",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "non-canonical rseed (= p)"
+      },
+      {
+        "ciphertext": "4a18a9e73ab4b2dd854d8d8d0459540758446e42c14b68c3ae781ddf9a7f1e7171dd30f33efd46aad786443ac02a2c6f432edc5eb2f009bc6c99cfd587d0ed4793592ae04d64996e4c1dbdd795c785bdc647ae4ddd448a1f3a0fcaace0cb5b302254f912fd4e5f99304b5f49c40753cbb7e071c529d4f447613a3badcbc022d6a628fb13",
+        "expect": "commitment_mismatch",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "name": "sender lies about amount"
+      }
+    ],
+    "cm": "0x2d8b922882bb3bf33aa212b792f04bb9407ec429bc0fe768035446b3e8ad2cde",
+    "leaf_index": 0,
+    "mint": "1111111111111111111111111111111111111111111111111111111111111111",
+    "recipient": {
+      "address": "poly1q8rln83648xzns23vxms90m53dlr07dthdeuctlfvy0fn6huhc58ee5t4erm7cf9r3knvqsxxmymqzunyf5t28636nv3e7eh7fw9scec6pxwcacz869hh9e8jygl4lkl",
+      "d": "c7f99e3aa9cc29c15161b7",
+      "diversifier_index": 0,
+      "fvk": "polyview1qykut0j9fft8v0j3m60mly98v5j9atuqqng6md3hv8zxvzms06hrktz5z5hsz00fdhqm7vuvc0w7gq4294ax2psp0xd5yfxxpne9hpczaa6343d8qncyht6vu2exvec7ezn50c7g7dy2pttx26m85wk65plsvtn7dh",
+      "g_d": "9ea3ac8fa44af816971cfe989f5193b83e0ef14d3b8a071f34b65514c94a8f1c",
+      "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+      "owner": "0x0636c9b00b932268b51f51d4d91cfb37f25c586338d04cec77023e8b7b972791",
+      "pk_d": "02bf748b7e37f9abbb73cc2fe9611e99eafcbe287ce68bae47bf61251c6d3602",
+      "seed": "0101010101010101010101010101010101010101010101010101010101010101"
+    }
+  },
+  "plaintext_len": 84,
+  "positive": [
+    {
+      "amount": "100",
+      "asset_id": "0x221dca7dc13ff865aeba26a6279adbdfe4f67fff7e2b2229013c0dfd8e2e29cb",
+      "ciphertext": "e96e15dbfd11f74e007f48446cc79b32779e4b22afaea541a14533a77ac9a86b98c64986b967bf6b25d326efb667fe963f13901b8371d75563daadb352db9bc5f3a3a8f180bfb3bf4adad909e0162175687543fe2b57bdf084188700b13a3e0558ad71e62be73e4c17a43f0d12ab945e0de958677ff41defcf82dcdceb7f15162a880821",
+      "cm": "0x072a7221969ed55f8f32b64d0be5324759e89f37eda81f5a8d3a0818b512bc37",
+      "epk": "e96e15dbfd11f74e007f48446cc79b32779e4b22afaea541a14533a77ac9a86b",
+      "esk": "ad9041d9530ed0593d6e8dffc54469d974aae42e1a00fc469ccbab7590205a7d",
+      "key": "922300bdb4a41e747d507d9d8f086b35657f4689d5e6adc36c5141b13425065d",
+      "leaf_index": 5,
+      "memo": "0000000000000000000000000000000000000000000000000000000000000000",
+      "mint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "name": "zero memo",
+      "nullifier": "0x285bb67841b0684f988a8aacd572f49549906e5c8212f464028b9a80cb27ed11",
+      "plaintext": "01c7f99e3aa9cc29c15161b7640000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000",
+      "recipient": {
+        "address": "poly1q8rln83648xzns23vxms90m53dlr07dthdeuctlfvy0fn6huhc58ee5t4erm7cf9r3knvqsxxmymqzunyf5t28636nv3e7eh7fw9scec6pxwcacz869hh9e8jygl4lkl",
+        "d": "c7f99e3aa9cc29c15161b7",
+        "diversifier_index": 0,
+        "fvk": "polyview1qykut0j9fft8v0j3m60mly98v5j9atuqqng6md3hv8zxvzms06hrktz5z5hsz00fdhqm7vuvc0w7gq4294ax2psp0xd5yfxxpne9hpczaa6343d8qncyht6vu2exvec7ezn50c7g7dy2pttx26m85wk65plsvtn7dh",
+        "g_d": "9ea3ac8fa44af816971cfe989f5193b83e0ef14d3b8a071f34b65514c94a8f1c",
+        "ivk": "polyivk1q8hh2xk95uz0qja0fn3tyen8rmy2w3lrere53g9dvettv736m2s87kk06a2",
+        "owner": "0x0636c9b00b932268b51f51d4d91cfb37f25c586338d04cec77023e8b7b972791",
+        "pk_d": "02bf748b7e37f9abbb73cc2fe9611e99eafcbe287ce68bae47bf61251c6d3602",
+        "seed": "0101010101010101010101010101010101010101010101010101010101010101"
+      },
+      "rseed": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "shared_secret": "0a0f24ef4837e45d9a4f3e3366249bc71758ca2f4f6388f52ff0bae803051007"
+    },
+    {
+      "amount": "0",
+      "asset_id": "0x221dca7dc13ff865aeba26a6279adbdfe4f67fff7e2b2229013c0dfd8e2e29cb",
+      "ciphertext": "66b1a9ad9060c6b3d0a475a04b6762239bd053bede53a6177ab5dd98641780128b316492e68ba6e1cbc9bd08ba6772bc3c2c57370850e3062cd8640b3bd49ee3191c41d2e57be85512ce149fef544da48dcc0cf306ae64a626a480fed5cb5478c28b43b0aa73f952cb425b8f7a3d086d9b97628eeaffb76ed0a50c6ef3e0d475fc15210b",
+      "cm": "0x1b095c099314dcbe1b15c96ed6ac72f3981f050041aed589393cad50b9b5a3bc",
+      "epk": "66b1a9ad9060c6b3d0a475a04b6762239bd053bede53a6177ab5dd9864178012",
+      "esk": "6f68ef8bf1d836ddfd8f6a5e3dee38fce989d8cdbfc8ce9ba26c2fac635d161d",
+      "key": "89e6885100c49dc53bd7a9e80667d827c9a28900bb7b9e214796a16778d62367",
+      "leaf_index": 8,
+      "memo": "636f70792d74726164653a20534f4c2f55534443206c6f6e6720327800000000",
+      "mint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "name": "ascii memo",
+      "nullifier": "0x0dffe4b0a77ddd4377afe9bb9780979cbbce02aa4008b417dd4bab2e9f2a86ef",
+      "plaintext": "01f3a60a246c2db795350d7400000000000000000000000000000000000000000000000000000000000000000000000000000003636f70792d74726164653a20534f4c2f55534443206c6f6e6720327800000000",
+      "recipient": {
+        "address": "poly1q8e6vz3ydskm09f4p46tsxw3k6t7ze8z32pgy2zfar87zfw6lws84lhzq5nr3v855y62yje8trq6qx775n53c3lqwyrcsqcva2raws6mlcjpvevckdsczrpyf5s2umyr",
+        "d": "f3a60a246c2db795350d74",
+        "diversifier_index": 1,
+        "fvk": "polyview1qyrgm6d8tlx3332z04sacug30z2hsh9nrdnccgy9dwp9vthheqdf6qhx0d8vnapj2u2pvx0n4k473rapwldlr30e2vfpv2nhk4ukv8luvnp8ms5ylcqcvthf0aa5lxvt9puyyzl9w6ccm7ejx5p7595egduqqeqq99",
+        "g_d": "660aff8f3a0f06c82a01c82000c7a353a46494dc158f0d82fa0b8d2609964526",
+        "ivk": "polyivk1q9jvylwzsnlqrp3wa9lhknue3v58ssstu4mtrr0mxg6s86skn9phsamrvar",
+        "owner": "0x2758c1a01bdea4e91c47e0710788030cea87d7435bfe24166598b361810c244d",
+        "pk_d": "b819d1b697e164e28a82822849e8cfe125dafba07afee2052638b0f4a134a24b",
+        "seed": "0202020202020202020202020202020202020202020202020202020202020202"
+      },
+      "rseed": "0x0000000000000000000000000000000000000000000000000000000000000003",
+      "shared_secret": "d2b6b90533b8b4092de520b66184b5ac29b58b293353d090ba9222a2fc10fa54"
+    },
+    {
+      "amount": "18446744073709551615",
+      "asset_id": "0x221dca7dc13ff865aeba26a6279adbdfe4f67fff7e2b2229013c0dfd8e2e29cb",
+      "ciphertext": "cf8d231b254c92e175d5d33e04ee716a64d0dab475ceacf12d7349bd1604a24a67eb865fa6f31efa8eb8d60ba3b3c06c99901563afd88588e8e58fd3cf376506af4791ff329682a99b42127703543962bf1a15d5abeabed18dddba5b103ac5bb6bc83f12adc372d7e9ddbcf6d9ce174569da2602289772b3b7b3e3ecd6b1e92d44f877b1",
+      "cm": "0x1dfa4dae8f6247a9c67591e8199f276a8d59a69ec4d43b9c6e2f73a5c03c7f3f",
+      "epk": "cf8d231b254c92e175d5d33e04ee716a64d0dab475ceacf12d7349bd1604a24a",
+      "esk": "41f298716fec83b458d9d6450ab6092cd6c445fbb4c980f11585e7f17922a86e",
+      "key": "38e7e3aaf1404c04bdc7d5b6ff981a2af8da97b0d9b51f2d4b08421a54896d07",
+      "leaf_index": 33554432,
+      "memo": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "mint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "name": "0xff memo",
+      "nullifier": "0x1ab0be9bee585706bc2d7d1c8c25cf78f4ac8d5606176c052b9ebf3fdb4d0381",
+      "plaintext": "01a2b83c89ffda94fb5370a2ffffffffffffffff0000000000000000000000000000000000000000000000000000000000000004ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "recipient": {
+        "address": "poly1qx3ts0yflldff76nwz3vxn43r98u6wm7kza5uk03dgz68tuv9waaz5lptgcdx8sl0ffk2r3yz0utmy7saqx5x7rtrve0ecpj7dlpfd37rr5250ctedmd8pjxcqtvzfj8",
+        "d": "a2b83c89ffda94fb5370a2",
+        "diversifier_index": 7,
+        "fvk": "polyview1qyzszq0dx5z2ve3ssl6gdz0usgl8k5ql9u7m3z39hsvlcmuplqqmqxzn70tpgr4akzard0dtcdfagtc6gscvjpfm5zherrdl55jzq79yent2p7ey3u5q7k0xlqz7haps026mfhl9pvvww42y5zlx6nad5k6qusx576",
+        "g_d": "112f6078a4f81afd044e5faf8a0217edc918051e4e4e5966078369bd888c5301",
+        "ivk": "polyivk1q8xddg8myj8jsr6eumuqt6l5xpattdxlu5933e64gjstum204kjmg80apdk",
+        "owner": "0x2413f8bd93d0e80d43786b1b32fce032f37e14b63e18e8aa3f0bcb76d38646c0",
+        "pk_d": "c34eb1194fcd3b7eb0bb4e59f16a05a3af8c2bbbd153e15a30d31e1f7a53650e",
+        "seed": "0303030303030303030303030303030303030303030303030303030303030303"
+      },
+      "rseed": "0x0000000000000000000000000000000000000000000000000000000000000004",
+      "shared_secret": "db3cc41522dacecc87847bd61781e07147d6888ed793311bee39dbd5e928ce06"
+    }
+  ],
+  "scheme": "X25519(esk, G_d) / HKDF-SHA256(salt=\"polypus.note-enc.v1\", ikm=shared, info=epk) / ChaCha20-Poly1305(nonce=0^12, aad=\"\")"
+}

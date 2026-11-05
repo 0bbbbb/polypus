@@ -15,6 +15,7 @@ use polypus_crypto::merkle::{zeros, MerkleTree, DEPTH};
 use polypus_crypto::note::{asset_id, nullifier, rcm, Note};
 use polypus_crypto::scenarios::{standard_scenarios, TEST_MINT};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -210,5 +211,118 @@ fn main() {
     }
     std::fs::write(root.join("circuits/kernel/src/fixtures.nr"), fx).unwrap();
 
-    eprintln!("wrote spec/vectors, circuits/polypus_notes/src/vectors.nr, circuits/kernel/src/fixtures.nr");
+    write("note_encryption.json", note_encryption_vectors());
+    std::fs::write(root.join("sdk/src/generated/poseidon-constants.ts"), poseidon_constants_ts()).unwrap();
+
+    eprintln!(
+        "wrote spec/vectors, circuits/polypus_notes/src/vectors.nr, circuits/kernel/src/fixtures.nr, sdk/src/generated/poseidon-constants.ts"
+    );
+}
+
+/// Note encryption KATs (spec §9): deterministic esk, positive and negative cases.
+fn note_encryption_vectors() -> Value {
+    use polypus_crypto::note_encryption::*;
+    let esk_for = |i: u8| -> [u8; 32] { Sha256::digest([b"polypus.test.esk".as_slice(), &[i]].concat()).into() };
+    let mint = TEST_MINT;
+    let aid = asset_id(&mint);
+    let recipient = |seed: u8, j: u32| {
+        let sk = SpendingKey::from_seed([seed; 32]);
+        let fvk = sk.full_viewing_key();
+        let a = sk.address(j);
+        let v = json!({
+            "seed": hex::encode([seed; 32]), "diversifier_index": j,
+            "fvk": fvk.encode(), "ivk": fvk.incoming().encode(), "address": a.encode(),
+            "d": hex::encode(a.d.0), "g_d": hex::encode(a.d.base().to_bytes()),
+            "pk_d": hex::encode(a.pk_d), "owner": h(&a.owner),
+        });
+        (sk, a, v)
+    };
+    let memos: [(&str, [u8; MEMO_LEN]); 3] = [
+        ("zero memo", [0u8; MEMO_LEN]),
+        ("ascii memo", memo_from_slice(b"copy-trade: SOL/USDC long 2x").unwrap()),
+        ("0xff memo", [0xffu8; MEMO_LEN]),
+    ];
+    let cases = [(1u8, 0u32, 100u64, 2u64, 5u64), (2, 1, 0, 3, 8), (3, 7, u64::MAX, 4, 1 << 25)];
+    let mut positive = Vec::new();
+    for (i, (&(seed, j, amount, rs, leaf), (label, memo))) in cases.iter().zip(memos.iter()).enumerate() {
+        let (sk, a, rv) = recipient(seed, j);
+        let pt = NotePlaintext { d: a.d, amount, rseed: Fr::from(rs), memo: *memo };
+        let esk = esk_for(i as u8);
+        let (epk, shared) = a.key_agreement(esk);
+        let ct = encrypt_with_esk(&a, &pt, esk).unwrap();
+        let fvk = sk.full_viewing_key();
+        let opened = open_note(&fvk, aid, pt.note(aid, a.owner).commitment(), leaf, &ct).unwrap();
+        positive.push(json!({
+            "name": label, "recipient": rv, "mint": hex::encode(mint), "asset_id": h(&aid),
+            "esk": hex::encode(esk), "epk": hex::encode(epk), "shared_secret": hex::encode(shared),
+            "key": hex::encode(derive_key(&shared, &epk)),
+            "amount": amount.to_string(), "rseed": h(&pt.rseed), "memo": hex::encode(memo),
+            "plaintext": hex::encode(pt.to_bytes()), "ciphertext": hex::encode(&ct),
+            "cm": h(&opened.cm), "leaf_index": leaf, "nullifier": h(&opened.nullifier.unwrap()),
+        }));
+    }
+
+    // Negative cases, all against recipient (1, 0) unless stated.
+    let (sk, a, rv) = recipient(1, 0);
+    let pt = NotePlaintext { d: a.d, amount: 42, rseed: Fr::from(9u64), memo: [0u8; MEMO_LEN] };
+    let cm = pt.note(aid, a.owner).commitment();
+    let good = encrypt_with_esk(&a, &pt, esk_for(100)).unwrap();
+    let flip = |i: usize| {
+        let mut c = good.clone();
+        c[i] ^= 1;
+        c
+    };
+    let mut bad_version = pt.to_bytes();
+    bad_version[0] = 2;
+    let mut bad_rseed = pt.to_bytes();
+    bad_rseed[20..52].copy_from_slice(&hex::decode("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001").unwrap());
+    let mut zero_epk = good.clone();
+    zero_epk[..32].fill(0);
+    let lie = encrypt_with_esk(&a, &NotePlaintext { amount: 43, ..pt }, esk_for(101)).unwrap();
+    let other_ivk = SpendingKey::from_seed([2; 32]).full_viewing_key().incoming().encode();
+    let neg = |name: &str, ct: &[u8], ivk: &str, expect: &str| {
+        json!({ "name": name, "ciphertext": hex::encode(ct), "ivk": ivk, "expect": expect })
+    };
+    let ivk = sk.full_viewing_key().incoming().encode();
+    let negative = vec![
+        neg("flipped epk byte", &flip(0), &ivk, "not_for_us"),
+        neg("flipped body byte", &flip(40), &ivk, "not_for_us"),
+        neg("flipped tag byte", &flip(CIPHERTEXT_LEN - 1), &ivk, "not_for_us"),
+        neg("truncated", &good[..CIPHERTEXT_LEN - 1], &ivk, "not_for_us"),
+        neg("wrong ivk", &good, &other_ivk, "not_for_us"),
+        neg("all-zero epk (low order)", &zero_epk, &ivk, "not_for_us"),
+        neg("plaintext version 2", &encrypt_bytes_with_esk(&a, &bad_version, esk_for(102)).unwrap(), &ivk, "not_for_us"),
+        neg("non-canonical rseed (= p)", &encrypt_bytes_with_esk(&a, &bad_rseed, esk_for(103)).unwrap(), &ivk, "not_for_us"),
+        neg("sender lies about amount", &lie, &ivk, "commitment_mismatch"),
+    ];
+    json!({
+        "scheme": "X25519(esk, G_d) / HKDF-SHA256(salt=\"polypus.note-enc.v1\", ikm=shared, info=epk) / ChaCha20-Poly1305(nonce=0^12, aad=\"\")",
+        "plaintext_len": PLAINTEXT_LEN, "ciphertext_len": CIPHERTEXT_LEN, "memo_len": MEMO_LEN,
+        "positive": positive,
+        "negative": { "recipient": rv, "mint": hex::encode(mint), "asset_id": h(&aid), "cm": h(&cm), "leaf_index": 0, "cases": negative },
+    })
+}
+
+/// circomlib Poseidon round constants and MDS matrices for the arities the
+/// TypeScript SDK needs (H_2, H_3, H_4, H_8), from light-poseidon.
+fn poseidon_constants_ts() -> String {
+    use light_poseidon::parameters::bn254_x5::get_poseidon_parameters;
+    let mut s = String::from("// @generated by `cargo run -p polypus-crypto --bin gen-vectors`. Do not edit.\n");
+    s.push_str("// circomlib Poseidon (BN254, x^5) parameters from light-poseidon, keyed by number of inputs.\n");
+    s.push_str("// Each constant is a 32-byte big-endian field element, hex-concatenated.\n\n");
+    s.push_str("export interface PoseidonParams { width: number; fullRounds: number; partialRounds: number; ark: string; mds: string }\n\n");
+    s.push_str("export const POSEIDON_PARAMS: Record<number, PoseidonParams> = {\n");
+    for n in [2u8, 3, 4, 8] {
+        let p = get_poseidon_parameters::<Fr>(n + 1).unwrap();
+        let ark: String = p.ark.iter().map(|x| hex::encode(polypus_crypto::field::to_bytes_be(x))).collect();
+        let mds: String = p.mds.iter().flatten().map(|x| hex::encode(polypus_crypto::field::to_bytes_be(x))).collect();
+        writeln!(
+            s,
+            "  {n}: {{ width: {}, fullRounds: {}, partialRounds: {}, ark: \"{ark}\", mds: \"{mds}\" }},",
+            p.width, p.full_rounds, p.partial_rounds
+        )
+        .unwrap();
+    }
+    s.push_str("};\n");
+    s
 }
