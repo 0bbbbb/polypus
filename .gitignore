@@ -18,3 +18,11 @@ test-ledger/
 circuits/**/Prover.toml
 !circuits/**/Prover.example.toml
 circuits/kernel/.tmp/
+
+# Node / app
+.env.*
+!.env.example
+dist/
+apps/keys/test-results/
+apps/keys/playwright-report/
+.near-credentials/

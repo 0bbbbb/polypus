@@ -1,0 +1,19 @@
+{
+  "name": "polypus",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "sdk",
+    "agents",
+    "apps/keys"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "app": "npm run dev -w apps/keys",
+    "build": "npm run build -w apps/keys",
+    "test": "npm test --workspaces --if-present",
+    "demo": "bash scripts/demo.sh"
+  }
+}
