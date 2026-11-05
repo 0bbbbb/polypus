@@ -1,0 +1,10 @@
+{
+  "name": "@polypus/agents",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@polypus/sdk": "*",
+    "near-api-js": "^5.0.0"
+  }
+}

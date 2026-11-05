@@ -1,0 +1,22 @@
+{
+  "name": "@polypus/keys-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174 --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4174",
+    "screenshots": "node tools/screenshots.mjs"
+  },
+  "dependencies": {
+    "@fontsource/inter-tight": "^5.3.0",
+    "@polypus/sdk": "*",
+    "@scure/base": "^1.2.4"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1"
+  }
+}
