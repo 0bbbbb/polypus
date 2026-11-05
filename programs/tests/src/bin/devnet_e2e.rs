@@ -236,8 +236,10 @@ fn main() {
 
     let tc = Toolchain::default_for_repo();
     let mut l = Ledger::new(11, acc.mint.to_bytes(), acc.pool.to_bytes(), chain_domain);
-    let alice = SpendingKey::from_seed(rand_seed());
-    let bob = SpendingKey::from_seed(rand_seed());
+    let alice_seed = rand_seed();
+    let bob_seed = rand_seed();
+    let alice = SpendingKey::from_seed(alice_seed);
+    let bob = SpendingKey::from_seed(bob_seed);
     let (aa, ba) = (alice.address(0), bob.address(0));
 
     let step = |net: &mut Net,
@@ -340,6 +342,38 @@ fn main() {
     }
     std::fs::write(&out_path, serde_json::to_string_pretty(&doc).unwrap()).expect("write deployment json");
     println!("wrote {out_path}");
+
+    let mut leaf_hex = Vec::new();
+    for i in 0..l.tree.len() {
+        leaf_hex.push(hex::encode(to_bytes_be(&l.tree.leaf(i).expect("leaf"))));
+    }
+    let ledger_path = std::env::var("POLYPUS_LEDGER_STATE").unwrap_or_else(|_| {
+        format!(
+            "{}/.polypus-keys/devnet-ledger.json",
+            std::env::var("HOME").unwrap_or_else(|_| ".".into())
+        )
+    });
+    let ledger = serde_json::json!({
+        "ledger_seed": 11u64,
+        "alice_seed": hex::encode(alice_seed),
+        "bob_seed": hex::encode(bob_seed),
+        "leaves": leaf_hex,
+        "mint": mint_str,
+        "pool": pool_str,
+        "chain_domain": hex::encode(chain_domain),
+        "depositor_secret": depositor.to_bytes().to_vec(),
+        "relayer_secret": relayer.to_bytes().to_vec(),
+        "depositor_token": acc.depositor_token.to_string(),
+        "recipient_token": acc.recipient_token.to_string(),
+        "relayer_token": acc.relayer_token.to_string(),
+        "tree": acc.tree.to_string(),
+        "vault": acc.vault.to_string(),
+    });
+    if let Some(parent) = std::path::Path::new(&ledger_path).parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    std::fs::write(&ledger_path, serde_json::to_string_pretty(&ledger).unwrap()).expect("write ledger state");
+    println!("wrote {ledger_path}");
 }
 
 fn l_note(l: &mut Ledger, amount: u64, owner: polypus_crypto::Fr) -> Note {

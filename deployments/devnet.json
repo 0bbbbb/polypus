@@ -1,0 +1,99 @@
+{
+  "actions": [
+    {
+      "action": "init_pool",
+      "cu": 29883,
+      "tx_bytes": 0
+    },
+    {
+      "action": "deposit 100",
+      "cu": 220215,
+      "tx_bytes": 1098
+    },
+    {
+      "action": "transfer 1-in, fee 2",
+      "cu": 215616,
+      "tx_bytes": 1115
+    },
+    {
+      "action": "deposit 25, fee 1",
+      "cu": 218384,
+      "tx_bytes": 1142
+    },
+    {
+      "action": "transfer 2-in, no fee",
+      "cu": 214302,
+      "tx_bytes": 1085
+    },
+    {
+      "action": "withdraw 85 2-in, fee 1",
+      "cu": 224546,
+      "tx_bytes": 1154
+    }
+  ],
+  "chain_domain": "fbc1be44a2adbdd352148e9601b67b8b8684032bd9afbad59c46f348c3585650",
+  "explorer_base": "https://explorer.solana.com/tx/{sig}?cluster=devnet",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "mint": "DNrrGhSQVgh6DYgzwc1qPiMsbnwAxnfJGMLjpwodPHkY",
+  "network": "devnet",
+  "pool": "DiUrcxwcsYMGnPGioyeL4hyRUqwn1DL1kZv7VxGdF6Em",
+  "program_id": "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",
+  "program_deploy_sig": "3baJxPpNpx6NqWjsizZdwk5TcBsyrq4CzurFJn4fGzt1HzKpn9q9pa3wH3f2Z9EoXykK5zLN9ARTEYjEfyrbt1Uk",
+  "rpc": "https://api.devnet.solana.com",
+  "signatures": [
+    {
+      "label": "program_deploy",
+      "sig": "3baJxPpNpx6NqWjsizZdwk5TcBsyrq4CzurFJn4fGzt1HzKpn9q9pa3wH3f2Z9EoXykK5zLN9ARTEYjEfyrbt1Uk"
+    },
+    {
+      "label": "init_pool",
+      "sig": "4c8AYADDrpW1H8896BxAipBXM8Em7NMtapZS6VHgEFoeNPH5MrW42mCWAm3g2F6C4QJie9bZphQeqBqmPNEPF7vw"
+    },
+    {
+      "label": "deposit 100",
+      "sig": "5YaQY4qAfZUb1siXvb6MMSe683aWhmk11qZ8FpyJEhixU3esFnAThxnFFhMNUuoviKV9rnT9NWNpfMvpNupSXmWd"
+    },
+    {
+      "label": "transfer 1-in, fee 2",
+      "sig": "47eTDy8SkkDAgNV6KELqAPHArxuQAMLoMhpL2HJkpST2P4tozBhPPn1q3S5CYdSeT3haMsEUccctcnjRTd4Rtsxn"
+    },
+    {
+      "label": "deposit 25, fee 1",
+      "sig": "5CQoSB97n6dMKqntDVjiosMRiqwffQ1PiS4ReKPkGp5YoNgtVK193BSrgJjkoAXWYX44dDMSDhVtMv8muyUYoZC6"
+    },
+    {
+      "label": "transfer 2-in, no fee",
+      "sig": "XgjWZ7e5JTnPT8xJiagZoHHnCvRBpueepVjAy8BS4BLYQVTMSRAarNNqEfnGyN9rsiy8cKV1V5TPwEnKGJjgefa"
+    },
+    {
+      "label": "withdraw 85 2-in, fee 1",
+      "sig": "5iAjoYrE1H1wZSseeMBjR988zrrK23mqfqyVr5XLCbfYXaeYbbB7JMM3A7NWh9vyVSAMdacBAjmBWRt8G6eArPXD"
+    },
+    {
+      "label": "keys_trader_trade",
+      "sig": "HKSrgdHCSVeqxnNCtbaVWMf71JBSR49PwWXdsh8dGPeiAMmd9d5qw5Rx26Ha4UeHNEZ2SVrSksN7bWZfKSFJAYQ"
+    },
+    {
+      "label": "keys_follower_copy",
+      "sig": "2Cnb1GTFpAxGHh5rVHoGra8encyb3PUCxafhKfsobFNRkhth3yrNqpDPUVzT3rqsQfHhpdFRxsk9QHbLvk3bkiuY"
+    },
+    {
+      "label": "chain_signatures_transfer",
+      "sig": "ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH"
+    }
+  ],
+  "tree": "ghaTQmA86N3Xb5HQjGosNLDTPHqV2m1iWqhhCX26BFA",
+  "vault": "EB5aEEXFCAsPqDvsSMGULw2oRJPNnj2MQiA9xwQX4gao",
+  "chain_signatures": {
+    "near_account": "carol-18e5.testnet",
+    "mpc_contract": "v1.signer-prod.testnet",
+    "path": "solana-1",
+    "domain_id": 1,
+    "solana_address": "6QWKrdhdQSywsM8xbT5TcJaznaFPM2r4kcN4Dzr2YNxw",
+    "fund_transfer_sig": "X2MkWNo6cTntSd8zS4UDHMQYhLXJdXgS3VxdE77ECrPaisLiJS3vBZrNb12jGnPYBmsQ12h7WQdvyG3xB2k6Z7N",
+    "solana_tx_sig": "ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH",
+    "near_sign_tx": "A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN",
+    "explorer_solana": "https://explorer.solana.com/tx/ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH?cluster=devnet",
+    "explorer_near": "https://explorer.testnet.near.org/transactions/A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN"
+  }
+}

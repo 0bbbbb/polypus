@@ -3,6 +3,7 @@
 import { accountFor, view, tg } from "../shared/near.js";
 import { REGISTRY, TRADER, FOLLOWER } from "../shared/config.js";
 import { generateAgentKeypair, unsealEpochKey, decryptFeedRecord } from "@polypus/sdk";
+import { runDevnetSettle, syncPublicDeployment } from "../shared/devnet.js";
 
 const GUARDRAILS = {
   maxTradeQuote: "250000000",
@@ -72,6 +73,10 @@ async function main() {
     const max = BigInt(GUARDRAILS.maxTradeQuote);
     const action = quote <= max ? "copy" : "resize";
     console.log(`trade ${trade.id}: ${action} (${trade.side} ${(trade.base as { symbol: string }).symbol})`);
+    if (action === "copy" && !decryptOnly) {
+      const sig = runDevnetSettle("follower");
+      if (sig) syncPublicDeployment();
+    }
   }
 }
 

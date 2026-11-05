@@ -7,6 +7,7 @@ import {
   randomEpochKey,
   sealEpochKey,
 } from "@polypus/sdk";
+import { runDevnetSettle, syncPublicDeployment } from "../shared/devnet.js";
 
 async function main() {
   const trader = await accountFor(TRADER);
@@ -37,6 +38,9 @@ async function main() {
   });
   console.log(`rotate_epoch → ${epoch}`);
 
+  const settlementSig = runDevnetSettle("trader");
+  syncPublicDeployment();
+
   const trade = {
     id: `t-${Date.now()}`,
     trader: TRADER,
@@ -48,7 +52,7 @@ async function main() {
     quoteAmount: "180000000",
     price: "180.0",
     executedAt: new Date().toISOString(),
-    settlements: [] as string[],
+    settlements: settlementSig ? [settlementSig] : [],
     provenance: { kind: "live", network: "solana-devnet" },
   };
   const ct = encryptFeedRecord(TRADER, epoch, epochKey, trade);

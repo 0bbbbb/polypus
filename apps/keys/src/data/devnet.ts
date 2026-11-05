@@ -6,6 +6,8 @@ export async function loadDevnetSettlements(): Promise<RedactedSettlement[]> {
     if (!res.ok) return [];
     const d = (await res.json()) as {
       network?: string;
+      pool?: string;
+      program_id?: string;
       signatures?: { label: string; sig: string }[];
       explorer_base?: string;
     };
@@ -14,7 +16,7 @@ export async function loadDevnetSettlements(): Promise<RedactedSettlement[]> {
       signature: s.sig,
       slot: 0,
       blockTime: new Date().toISOString(),
-      pool: "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",
+      pool: d.pool ?? "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",
       feePayer: "",
       nullifiers: ["nf_devnet_redacted", "nf_devnet_redacted"],
       commitments: ["cm_devnet_redacted", "cm_devnet_redacted"],

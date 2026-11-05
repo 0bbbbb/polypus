@@ -25,12 +25,12 @@ npm run app                    # http://127.0.0.1:5174
 | Tech | Status | Code / proof |
 |---|---|---|
 | **keys-registry** contract | **Real testnet** `polypus-keys-18e5.testnet` | `contracts/keys-registry/` |
-| **Chain Signatures** → Solana | **Real** `v1.signer-prod.testnet` sign tx `8HMx1bHi…` | `docs/hackathon/RESEARCH.md`, `/tmp/nr/sign.log` |
+| **Chain Signatures** → Solana | **Real** MPC-signed **devnet** transfer (`chain_signatures` in `deployments/devnet.json`) | `scripts/chainsig-devnet.mjs` |
 | **1Click / Intents** quotes | **Real** mainnet API, dry quotes | `apps/keys/src/near/oneclick.ts` |
 | Confidential Intents checkout | **Not wired** (Partner JWT) | UI label |
 | **NEAR AI Cloud** inference | **Mocked** without `NEARAI_API_KEY` | `agents/` stub, UI SIMULATED |
 | OutLayer TEE agents | **Mocked** locally; path documented | `docs/hackathon/SCOPE.md` |
-| Polypus pool on Solana | **Localnet proofs**; devnet deploy **in progress** | `programs/` |
+| Polypus pool on Solana devnet | **Real** Groth16 pool + Keys agent deposits | `deployments/devnet.json`, `#/explorer/…` |
 
 ## Live testnet commands
 

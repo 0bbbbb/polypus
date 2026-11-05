@@ -9,7 +9,7 @@ Polypus Keys is private copy-trading for the NEAR ecosystem: traders keep positi
 
 ## Blockers (human action)
 
-- **Solana devnet SOL:** fund `87EzYr9mfpT5fEm7qYZDqSq63VQabxFkZi7RcPkMTRQG` (≥3 SOL) via [faucet.solana.com](https://faucet.solana.com), then `bash scripts/devnet-deploy.sh` — see [scripts/FUND_DEVNET.md](../../scripts/FUND_DEVNET.md).
+- **Solana devnet:** program deployed; proofs and explorer links in [deployments/devnet.json](../../deployments/devnet.json) (copied to the app under `apps/keys/public/deployments/`).
 - **NEAR AI Cloud / OutLayer:** `NEARAI_API_KEY` for live TEE inference labels (agents run SIMULATED without it).
 - **1Click Partner JWT:** confidential Intents checkout (dry quotes work without it).
 

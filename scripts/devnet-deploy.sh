@@ -25,14 +25,28 @@ awk -v b="$bal" -v m="$MIN_SOL" 'BEGIN{ exit (b+0 >= m) ? 0 : 1 }' || {
 }
 
 (cd programs && anchor build >/dev/null 2>&1 || cargo build-sbf --manifest-path polypus-pool/Cargo.toml)
-(cd programs && cargo build -q --release -p polypus-tests --bin devnet-e2e)
+(cd programs && cargo build -q --release -p polypus-tests --bin devnet-e2e --bin keys-agent-settle)
 
-buf=$(mktemp)
-solana program deploy -k "$KP" --url "$RPC" --buffer "$buf" --program-id "$PROGRAM_KP" programs/target/deploy/polypus_pool.so
-
+SOZ=$(stat -c%s programs/target/deploy/polypus_pool.so)
+MAX_LEN=$((SOZ + 65536))
+echo "Program size ${SOZ} B; deploy --max-len ${MAX_LEN} (rent ~$(solana rent "$MAX_LEN" --url "$RPC" | awk '{print $4}') SOL)"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+solana-keygen new --no-bip39-passphrase --silent -o "$work/buffer.json"
+deploy_out=$(solana program deploy -k "$KP" --url "$RPC" --max-len "$MAX_LEN" \
+  --buffer "$work/buffer.json" --program-id "$PROGRAM_KP" programs/target/deploy/polypus_pool.so 2>&1 | tee /dev/stderr)
+deploy_sig=$(echo "$deploy_out" | awk '/^Signature: / {print $2}')
 mkdir -p deployments
 POLYPUS_RPC="$RPC" POLYPUS_ALLOW_DEVNET=1 POLYPUS_DEVNET_KEYPAIR="$KP" \
   POLYPUS_DEPLOYMENT_OUT="$ROOT/deployments/devnet.json" \
   programs/target/release/devnet-e2e
 
-echo "Devnet deployment written to deployments/devnet.json"
+if [ -n "$deploy_sig" ] && command -v jq >/dev/null 2>&1; then
+  tmp=$(mktemp)
+  jq --arg s "$deploy_sig" \
+    '.program_deploy_sig = $s | .signatures = ([{"label":"program_deploy","sig":$s}] + (.signatures // []))' \
+    deployments/devnet.json > "$tmp" && mv "$tmp" deployments/devnet.json
+fi
+mkdir -p apps/keys/public/deployments
+cp deployments/devnet.json apps/keys/public/deployments/devnet.json
+echo "Devnet deployment written to deployments/devnet.json (+ apps/keys/public/deployments/)"
