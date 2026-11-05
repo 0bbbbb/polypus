@@ -7,6 +7,12 @@
 
 Polypus Keys is private copy-trading for the NEAR ecosystem: traders keep positions shielded on Solana devnet and via NEAR Intents pricing, publish one attested PnL number from a TEE, and sell viewing keys that only a follower’s copy-trade agent (in a TEE) can use—never the human. Followers pay through NEAR Intents 1-Click (dry quotes in the demo; testnet NEAR subscription on-chain). NEAR Chain Signatures tie each trader’s NEAR account to a Solana depositor. Built for NEAR HACKATHON.
 
+## Blockers (human action)
+
+- **Solana devnet SOL:** fund `87EzYr9mfpT5fEm7qYZDqSq63VQabxFkZi7RcPkMTRQG` (≥3 SOL) via [faucet.solana.com](https://faucet.solana.com), then `bash scripts/devnet-deploy.sh` — see [scripts/FUND_DEVNET.md](../../scripts/FUND_DEVNET.md).
+- **NEAR AI Cloud / OutLayer:** `NEARAI_API_KEY` for live TEE inference labels (agents run SIMULATED without it).
+- **1Click Partner JWT:** confidential Intents checkout (dry quotes work without it).
+
 ## Checklist (human)
 
 - [ ] Make `polypus` repo **public** (GitHub or Origin) before **2026-11-14 23:59 UTC**
