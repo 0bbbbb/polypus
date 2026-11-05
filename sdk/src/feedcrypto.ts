@@ -38,8 +38,8 @@ export function encryptFeedRecord(
   const pt = new TextEncoder().encode(canonicalJson(record));
   const nonce = randomNonce24();
   const aad = new TextEncoder().encode(`polypus-keys/feed/v1|${trader}|${epoch}`);
-  const cipher = xchacha20poly1305(epochKey, nonce);
-  const ct = cipher.encrypt(pt, aad);
+  const cipher = xchacha20poly1305(epochKey, nonce, aad);
+  const ct = cipher.encrypt(pt);
   const out = new Uint8Array(nonce.length + ct.length);
   out.set(nonce, 0);
   out.set(ct, nonce.length);
@@ -56,8 +56,8 @@ export function decryptFeedRecord(
   const nonce = raw.slice(0, 24);
   const ct = raw.slice(24);
   const aad = new TextEncoder().encode(`polypus-keys/feed/v1|${trader}|${epoch}`);
-  const cipher = xchacha20poly1305(epochKey, nonce);
-  const pt = cipher.decrypt(ct, aad);
+  const cipher = xchacha20poly1305(epochKey, nonce, aad);
+  const pt = cipher.decrypt(ct);
   return JSON.parse(new TextDecoder().decode(pt)) as TradeRecordWire;
 }
 
@@ -76,8 +76,8 @@ export function sealEpochKey(
   const k = hkdf(sha256, shared, salt, "polypus-keys/seal/v1", 32);
   const nonce = randomNonce24();
   const aad = new TextEncoder().encode(`polypus-keys/seal/v1|${trader}|${follower}|${epoch}`);
-  const cipher = xchacha20poly1305(k, nonce);
-  const ct = cipher.encrypt(epochKey, aad);
+  const cipher = xchacha20poly1305(k, nonce, aad);
+  const ct = cipher.encrypt(epochKey);
   const out = new Uint8Array(epk.length + nonce.length + ct.length);
   out.set(epk, 0);
   out.set(nonce, epk.length);
@@ -101,8 +101,8 @@ export function unsealEpochKey(
   const salt = concat(epk, agentPk);
   const k = hkdf(sha256, shared, salt, "polypus-keys/seal/v1", 32);
   const aad = new TextEncoder().encode(`polypus-keys/seal/v1|${trader}|${follower}|${epoch}`);
-  const cipher = xchacha20poly1305(k, nonce);
-  return cipher.decrypt(ct, aad);
+  const cipher = xchacha20poly1305(k, nonce, aad);
+  return cipher.decrypt(ct);
 }
 
 export function generateAgentKeypair(): { publicKey: string; secretKey: Uint8Array } {

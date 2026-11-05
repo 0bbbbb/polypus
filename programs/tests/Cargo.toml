@@ -10,6 +10,10 @@ publish = false
 name = "localnet-e2e"
 path = "src/bin/localnet_e2e.rs"
 
+[[bin]]
+name = "devnet-e2e"
+path = "src/bin/devnet_e2e.rs"
+
 [dependencies]
 litesvm = "=0.18.1"
 # Same requirements as litesvm 0.18.1, so the types unify.

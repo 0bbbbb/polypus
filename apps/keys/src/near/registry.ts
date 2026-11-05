@@ -40,6 +40,8 @@ export type TraderOnChain = {
   subscriber_count: number;
   latest_pnl_statement: string;
   latest_pnl_signature: string;
+  attestor_pubkey: string;
+  attestor_attestation_digest: string;
   bio?: string;
 };
 

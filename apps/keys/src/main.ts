@@ -12,12 +12,14 @@ import {
   RECORDED_TRADES,
   pnlPercent,
 } from "./data/recorded.js";
+import { loadLiveTraders } from "./data/live.js";
 import type { Provenance, Trader } from "./data/types.js";
-import { fetchTradersLive, type TraderOnChain } from "./near/registry.js";
 import { dryQuote } from "./near/oneclick.js";
+import { loadDevnetSettlements } from "./data/devnet.js";
 
 const app = document.getElementById("app")!;
-let liveTraders: TraderOnChain[] | null = null;
+let traders: Trader[] = RECORDED_TRADERS;
+let liveMode = false;
 let quotePreview: string = "Click refresh for a live dry quote (mainnet 1Click, no spend).";
 
 function provBadge(p: Provenance): string {
@@ -32,13 +34,18 @@ function route(): { page: string; id?: string } {
   return { page, id };
 }
 
+function navBrand() {
+  return `<a class="nav__brand" href="#/leaderboard"><img class="nav__mark" src="./brand/polypus-mark.svg" width="22" height="22" alt=""> Polypus Keys</a>`;
+}
+
 function nav(active: string) {
+  const lead = traders[0]?.account ?? RECORDED_TRADERS[0].account;
   const items = [
     ["leaderboard", "Leaderboard"],
-    [`trader/${RECORDED_TRADERS[0].account}`, "Trader"],
-    [`checkout/${RECORDED_TRADERS[0].account}`, "Checkout"],
+    [`trader/${lead}`, "Trader"],
+    [`checkout/${lead}`, "Checkout"],
     ["follower", "Follower"],
-    [`explorer/${RECORDED_TRADERS[0].account}`, "Explorer"],
+    [`explorer/${lead}`, "Explorer"],
   ];
   return items
     .map(([href, label]) => {
@@ -53,7 +60,7 @@ function traderCards(traders: Trader[]) {
     .map((t, i) => {
       const pnl = pnlPercent(t.pnl.pnlBps);
       return `<article class="kc" style="position:relative;margin-bottom:16px">
-        <header class="kc__head"><div class="kc__title"><span class="kc__rank">${i + 1}</span> ${t.handle} · <span class="mono">${t.account}</span></div>
+        <header class="kc__head"><div class="kc__title"><span class="kc__rank">${i + 1}</span> ${t.handle} <span style="color:var(--ink-2);font-weight:400">· ${t.account}</span></div>
         <span class="kc__tag kc__tag--live"><i class="dot"></i> Attested</span></header>
         <div class="kc__lead kc__group"><div class="kc__big">${pnl}</div><div class="kc__sub">${t.pnl.tradeCount} trades · window through ${t.pnl.windowEnd.slice(0, 10)}</div>
         ${provBadge(t.pnl.provenance)}</div>
@@ -65,26 +72,24 @@ function traderCards(traders: Trader[]) {
 }
 
 function renderLeaderboard() {
-  const traders = RECORDED_TRADERS;
-  const liveBanner =
-    liveTraders && liveTraders.length
-      ? `<div class="banner"><b>Live registry:</b> ${liveTraders.length} trader(s) on <span class="mono">${liveTraders[0]?.account ?? ""}</span> contract.</div>`
-      : `<div class="banner banner--sim"><b>Demo mode:</b> leaderboard uses recorded fixtures. Set <span class="mono">VITE_LIVE=1</span> and refresh for NEAR testnet views.</div>`;
-  app.innerHTML = `<div class="app"><nav class="nav"><a class="nav__brand" href="#/leaderboard">Polypus Keys</a><div class="nav__links">${nav("leaderboard")}</div></nav>
+  const liveBanner = liveMode
+    ? `<div class="banner"><b>Live registry</b> on <span class="mono">polypus-keys-18e5.testnet</span> — PnL from on-chain statements when published.</div>`
+    : `<div class="banner banner--sim"><b>Fallback fixtures.</b> Run with <span class="mono">VITE_LIVE=1</span> for testnet traders + PnL.</div>`;
+  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("leaderboard")}</div></nav>
   <main class="main"><h1 class="h2" style="margin-bottom:16px">Attested PnL, hidden trades</h1>
   ${liveBanner}${traderCards(traders)}</main>
   <footer class="footer">Built for NEAR HACKATHON · Chain Signatures · Intents · NEAR AI Cloud</footer></div>`;
 }
 
 function renderTrader(id: string) {
-  const t = RECORDED_TRADERS.find(x => x.account === decodeURIComponent(id)) ?? RECORDED_TRADERS[0];
+  const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
   const rows = RECORDED_TRADES.filter(tr => tr.trader === t.account)
     .map(
       tr => `<li class="is-hit"><div class="kc__fa"><b class="dec" data-dec>${tr.side.toUpperCase()} ${tr.base.symbol}</b><span class="dec" data-dec>${tr.quoteAmount} ${tr.quote.symbol}</span></div>
       <div class="kc__fv"><span class="mono dec" data-dec>${tr.price}</span><span class="mono dec" data-dec>${tr.executedAt.slice(11, 19)}Z</span></div></li>`,
     )
     .join("");
-  app.innerHTML = `<div class="app"><nav class="nav"><a class="nav__brand" href="#/leaderboard">Polypus Keys</a><div class="nav__links">${nav("trader")}</div></nav>
+  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("trader")}</div></nav>
   <main class="main grid2"><div>${traderCards([t])}</div>
   <div class="panel"><h2>Activity feed</h2><p>Public view: values redacted. Key holders decrypt inside the agent TEE.</p>
   <article class="kc"><header class="kc__head"><div class="kc__title">${t.handle} · shielded</div><span class="kc__tag">Encrypted</span></header>
@@ -99,8 +104,8 @@ function renderTrader(id: string) {
 }
 
 function renderCheckout(id: string) {
-  const t = RECORDED_TRADERS.find(x => x.account === decodeURIComponent(id)) ?? RECORDED_TRADERS[0];
-  app.innerHTML = `<div class="app"><nav class="nav"><a class="nav__brand" href="#/leaderboard">Polypus Keys</a><div class="nav__links">${nav("checkout")}</div></nav>
+  const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
+  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("checkout")}</div></nav>
   <main class="main"><article class="kc" style="max-width:440px;margin:0 auto">
   <header class="kc__head"><div class="kc__title">Buy key · ${t.handle}</div><span class="kc__tag">1Click</span></header>
   <div class="kc__group"><div class="kc__pay"><div class="kc__amt">${(Number(t.price.amount) / 1e24).toFixed(2)}<small>NEAR</small></div><span class="kc__chip">30 days</span></div>
@@ -131,7 +136,7 @@ function renderCheckout(id: string) {
 function renderFollower() {
   const a = RECORDED_AGENT;
   const sub = RECORDED_SUB;
-  app.innerHTML = `<div class="app"><nav class="nav"><a class="nav__brand" href="#/leaderboard">Polypus Keys</a><div class="nav__links">${nav("follower")}</div></nav>
+  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("follower")}</div></nav>
   <main class="main grid2"><article class="kc"><header class="kc__head"><div class="kc__title">Copy agent</div><span class="kc__tag kc__tag--live"><i class="dot"></i> Online</span></header>
   <div class="kc__group kc__dl"><div><dt>Follower</dt><dd class="mono">${sub.follower}</dd></div>
   <div><dt>Trader</dt><dd class="mono">${sub.trader}</dd></div>
@@ -144,9 +149,10 @@ function renderFollower() {
   <footer class="footer">Subscribe on NEAR testnet · epoch keys sealed to agent X25519 pubkey</footer></div>`;
 }
 
-function renderExplorer(id: string) {
-  const s = RECORDED_SETTLEMENTS[0];
-  app.innerHTML = `<div class="app"><nav class="nav"><a class="nav__brand" href="#/leaderboard">Polypus Keys</a><div class="nav__links">${nav("explorer")}</div></nav>
+async function renderExplorer(id: string) {
+  const dev = await loadDevnetSettlements();
+  const s = dev[0] ?? RECORDED_SETTLEMENTS[0];
+  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("explorer")}</div></nav>
   <main class="main grid2"><div class="panel"><h2>Public settlement</h2><p>Redacted explorer view — no amounts or tokens.</p>
   <div class="kc__dl"><div><dt>Signature</dt><dd class="mono">${truncate(s.signature)}</dd></div>
   <div><dt>Slot</dt><dd class="mono">${s.slot}</dd></div>
@@ -161,17 +167,21 @@ function renderExplorer(id: string) {
 
 async function refreshLive() {
   if (import.meta.env.VITE_LIVE !== "1") return;
-  liveTraders = await fetchTradersLive();
+  const live = await loadLiveTraders();
+  if (live.length) {
+    traders = live;
+    liveMode = true;
+  }
 }
 
-function render() {
+async function render() {
   const { page, id } = route();
-  if (page === "trader") renderTrader(id ?? RECORDED_TRADERS[0].account);
-  else if (page === "checkout") renderCheckout(id ?? RECORDED_TRADERS[0].account);
+  if (page === "trader") renderTrader(id ?? traders[0].account);
+  else if (page === "checkout") renderCheckout(id ?? traders[0].account);
   else if (page === "follower") renderFollower();
-  else if (page === "explorer") renderExplorer(id ?? "");
+  else if (page === "explorer") await renderExplorer(id ?? "");
   else renderLeaderboard();
 }
 
-window.addEventListener("hashchange", () => render());
-refreshLive().finally(render);
+window.addEventListener("hashchange", () => void render());
+refreshLive().finally(() => void render());

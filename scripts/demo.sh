@@ -15,6 +15,9 @@ echo "== TypeScript workspaces"
 npm install --silent
 npm run build -w apps/keys
 
+echo "== Keys NEAR e2e (subscribe → feed → decrypt → PnL)"
+node scripts/keys-e2e.mjs
+
 echo "== Live NEAR testnet view (optional)"
 if command -v near >/dev/null; then
   NEAR_ENV=testnet near contract call-function as-read-only polypus-keys-18e5.testnet get_traders json-args '{"from_index":0,"limit":5}' network-config testnet now 2>/dev/null | head -20 || true

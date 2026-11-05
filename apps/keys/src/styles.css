@@ -303,7 +303,8 @@ html.js .keys.is-seq { height: 620vh; }
 /* app chrome */
 .app { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
 .nav { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: var(--nav-h); padding: 0 24px; background: rgb(255 255 255 / 0.86); backdrop-filter: blur(12px); box-shadow: inset 0 -1px 0 var(--line); }
-.nav__brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: -0.03em; }
+.nav__brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: -0.03em; color: var(--ink); }
+.nav__mark { flex: none; }
 .nav__links { display: flex; gap: 4px; flex-wrap: wrap; }
 .nav__links a { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; color: var(--ink-2); }
 .nav__links a.is-on { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }

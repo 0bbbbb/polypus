@@ -1,108 +1,64 @@
-# Polypus
+# Polypus Keys · private copy-trading (NEAR HACKATHON)
 
-Privacy protocol on Solana: shielded SPL transfers and, later, private programs
-over shielded notes. Design: [`../docs/POLYPUS_DESIGN.md`](../docs/POLYPUS_DESIGN.md).
+**One line:** traders keep trades shielded, publish **one attested PnL**, and sell viewing keys that only a **follower agent in a TEE** can use—never the human. Followers pay via **NEAR Intents**; settlements use **Polypus** on Solana; **Chain Signatures** link NEAR accounts to Solana signers.
 
-> **⚠️ UNAUDITED RESEARCH CODE — LOCALNET / DEVNET ONLY.**
-> Nothing here has been reviewed or audited. The Groth16 keys in
-> `artifacts/dev/` come from an **INSECURE single-party dev setup**: whoever ran
-> it could forge proofs. Do not deploy to mainnet, do not use real funds, and do
-> not describe this code as secure. Keypairs are never committed (see `.gitignore`).
+> **UNAUDITED research code — testnet/devnet only.** See [LICENSE](LICENSE). Never use real funds in Polypus contracts.
 
-## Status (Milestone 1 + start of M2)
+## Try Polypus Keys in 5 minutes
+
+```bash
+cd polypus
+source scripts/env.sh          # optional pinned toolchain
+npm install
+npm run demo                   # protocol tests + app build + NEAR keys e2e
+VITE_LIVE=1 npm run app         # http://127.0.0.1:5174
+```
+
+| Do | See |
+|---|---|
+| `node scripts/keys-e2e.mjs` | **Live testnet:** subscribe → seal epoch key → encrypted feed → decrypt → **publish_pnl** (checkpoints printed) |
+| Open `#/leaderboard` with `VITE_LIVE=1` | Traders from **`polypus-keys-18e5.testnet`** with on-chain PnL statements |
+| Checkout → **Refresh dry quote** | Real **1Click** mainnet quote (`dry: true`) |
+| `bash scripts/devnet-deploy.sh` | **Solana devnet** pool deploy + real-proof deposit/transfer/withdraw → `deployments/devnet.json` (needs ≥3 SOL — [FUND_DEVNET.md](scripts/FUND_DEVNET.md)) |
+
+Judge quickstart: [docs/hackathon/README_KEYS.md](docs/hackathon/README_KEYS.md) · Scope: [docs/hackathon/SCOPE.md](docs/hackathon/SCOPE.md) · Submission draft: [docs/hackathon/SUBMISSION.md](docs/hackathon/SUBMISSION.md)
+
+## NEAR technology (real vs mocked)
+
+| Tech | Status | Where |
+|---|---|---|
+| **keys-registry** (testnet) | **Real** | [contracts/keys-registry/](contracts/keys-registry/) · `polypus-keys-18e5.testnet` |
+| **Chain Signatures** → Solana ed25519 | **Real** (testnet `sign` verified) | [docs/hackathon/RESEARCH.md](docs/hackathon/RESEARCH.md) |
+| **1Click / Intents** dry quotes | **Real** (mainnet API) | [apps/keys/src/near/oneclick.ts](apps/keys/src/near/oneclick.ts) |
+| Encrypted feed + epoch keys | **Real** on registry | [sdk/src/feedcrypto.ts](sdk/src/feedcrypto.ts), [agents/](agents/) |
+| PnL attestor + follower agent TEE | **SIMULATED** locally | [agents/attestor/](agents/attestor/), [agents/follower/](agents/follower/) — needs `NEARAI_API_KEY` / OutLayer for live TEE |
+| Confidential Intents checkout | **Not wired** (Partner JWT) | UI label |
+| Polypus pool on Solana devnet | **Pipeline ready** — blocked on devnet SOL | [scripts/devnet-deploy.sh](scripts/devnet-deploy.sh) |
+
+## Polypus protocol (Solana privacy)
+
+Private SPL transfers and private programs on Solana. Design: [`../docs/POLYPUS_DESIGN.md`](../docs/POLYPUS_DESIGN.md).
+
+### Status (Milestone 1 + M2 + Keys NEAR integration)
 
 | Area | State |
 |---|---|
-| `spec/SPEC.md` | Kernel v1 cryptographic spec (field, Poseidon, tags, keys, addresses, notes, tree, constraints K1–K12, ext_data) |
-| `crates/polypus-crypto` | Rust reference implementation and test-vector generator |
-| `circuits/polypus_notes` | Noir library shared by the kernel and future programs |
-| `circuits/kernel` | 2-in/2-out kernel circuit; a negative test for every constraint |
-| `crates/polypus-prover` | nargo → Sunspot Groth16 proving glue, `polypus-prove` CLI |
-| `programs/` | Anchor pool program (init/deposit/transact/withdraw) with an on-chain Groth16 verifier. End to end on LiteSVM and `solana-test-validator` with real kernel proofs, ~212k–226k CU per action; see `programs/README.md` |
-| `docs/adr/` | Architecture decision records |
-| `docs/benchmarks.md` | Constraint count, proving time, CU |
+| `spec/SPEC.md`, `crates/polypus-crypto`, Noir kernel | Reference impl + vectors |
+| `programs/polypus-pool` | Anchor pool, real Groth16 proofs, ~220k CU (localnet e2e) |
+| `apps/keys/` | Hackathon product UI |
+| `agents/` | Trader node, attestor, follower (local SIMULATED TEE) |
 
-## Layout
-
-```
-polypus/
-├─ spec/                 SPEC.md + JSON test vectors (generated)
-├─ crates/
-│  ├─ polypus-crypto/    reference impl: keys, poly1 addresses, notes, nullifiers,
-│  │                     Merkle tree, ext_data, kernel relation, scenarios
-│  └─ polypus-prover/    proving pipeline + `polypus-prove` CLI (dev only)
-├─ circuits/             Noir workspace (nargo 1.0.0-beta.22)
-│  ├─ polypus_notes/     shared note/key/tree library + cross-language KAT tests
-│  └─ kernel/            kernel v1 circuit + tests (fixtures generated from Rust)
-├─ programs/             Solana workspace (Anchor 1.2.2): polypus-pool, polypus-verifier
-├─ docs/adr/  docs/benchmarks.md
-├─ scripts/              env.sh, setup-toolchain.sh, dev-setup.sh (INSECURE), localnet e2e
-└─ sdk/                  TypeScript SDK (M4, empty)
-```
-
-## Toolchain (pinned; see ADR-0001)
-
-| Tool | Version |
-|---|---|
-| Rust | 1.99.1 (host); SBF builds use platform-tools v1.57 / Rust 1.95.0 |
-| Noir | nargo 1.0.0-beta.22 (required by Sunspot v1.0.0) |
-| noir-lang/poseidon | v0.4.0 (circomlib-compatible) |
-| Sunspot | v1.0.0 (gnark v0.14.0) |
-| Go | 1.27.3 |
-| Agave / Solana CLI | 4.4.0 (cargo-build-sbf 4.5.0) |
-| Anchor | 1.2.2 |
-| Node | 22.23.3 |
-
-```bash
-scripts/setup-toolchain.sh     # installs all of the above into $HOME, no sudo
-source scripts/env.sh
-```
-
-## Build and test
+### Build and test (protocol)
 
 ```bash
 source scripts/env.sh
-
-# 1. Rust reference implementation: unit, negative and property tests
-cargo test --release -p polypus-crypto
-
-# 2. Regenerate the cross-language vectors and Noir fixtures (deterministic; CI should diff)
-cargo run --release -p polypus-crypto --bin gen-vectors
-
-# 3. Noir: KAT parity with Rust + kernel honest/negative tests
-(cd circuits && nargo test --workspace)
-
-# 4. Proving pipeline (INSECURE dev setup, then prove/verify/tamper/bench/differential)
-scripts/dev-setup.sh
-cargo build --release -p polypus-prover
-./target/release/polypus-prove scenarios     # prove + verify deposit, transfers, withdraw
-./target/release/polypus-prove tamper        # mutated proof / public input must be rejected
-./target/release/polypus-prove bench 20
-./target/release/polypus-prove diff 10000 8  # Rust reference vs Noir circuit, random + mutated witnesses
-
-# 5. Solana pool program (LiteSVM): unit tests, then end to end with REAL kernel proofs
-cd programs && anchor build                     # compiles ../artifacts/dev/kernel.vk into the pool
-cargo test --release --workspace
-cargo test --release -p polypus-tests --test kernel_e2e -- --ignored --nocapture --test-threads 1
-cd ..
-
-# 6. Localnet (solana-test-validator): deploy + deposit → transfer → withdraw, with CU
-scripts/localnet-e2e.sh
+bash scripts/test-all.sh
+scripts/localnet-e2e.sh          # real proofs on local validator
 ```
 
-The localnet script needs the program keypair
-`programs/keys/polypus_pool-keypair.json`. It is git-ignored and must match
-`declare_id!`. On a fresh clone, generate one with `solana-keygen grind` and
-update `declare_id!` and `Anchor.toml`.
+Full layout and toolchain pins remain in git history below this section.
 
-## Security notes
+## Security
 
-- Every constraint the kernel enforces is listed in `spec/SPEC.md` §6.3 and
-  in the header of `circuits/kernel/src/kernel.nr`. Each has a named negative
-  test in `circuits/kernel/src/tests.nr`.
-- Known gaps, by design for this milestone (ADR-0005): no escape path for
-  locked notes, no program proofs (the pool rejects `program_id ≠ 0`), no note
-  encryption, no MPC ceremony.
-- The dev proving key lives in `artifacts/dev/` and is git-ignored. Each
-  `scripts/dev-setup.sh` run produces a *different* VK, after which the pool
-  program must be rebuilt.
+- Unaudited. Dev/test keys only. Do not deploy Polypus to mainnet with real funds.
+- Hackathon NEAR integration is judged separately from pre-Oct-19 Solana protocol work ([HACKATHON-RULES.md](docs/hackathon/HACKATHON-RULES.md)).
