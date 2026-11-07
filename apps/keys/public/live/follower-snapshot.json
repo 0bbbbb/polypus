@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-11-07T23:34:58.092Z",
+  "agentPublicKey": "FPox7uQCraZm7rtBnb5pKxyNPLCAttXQmXKB366T3HLx",
+  "agentAttestationDigest": "nearai-gw-2dbd42d499b100e062144409",
+  "guardrailsHash": "sha256-ec353ceb222365ffe9705d366499b370",
+  "guardrails": {
+    "maxTradeQuote": "250000000",
+    "allowedTokens": [
+      "SOL",
+      "JUP"
+    ],
+    "dailyLossLimitBps": 500,
+    "copyRatioBps": 8000
+  },
+  "teeKind": "nearai-gateway",
+  "gatewayQuoteDigest": "a3f5af4aca8341bd10f4fda2819d4143",
+  "decisions": [
+    {
+      "at": "2026-11-07T23:28:15.426Z",
+      "tradeId": "t-1794094095426",
+      "side": "buy",
+      "symbol": "SOL",
+      "quoteHuman": "180 pUSD",
+      "action": "copy",
+      "reason": "within max notional and allowlist (copy_guardrail)",
+      "explanation": "Decision: copy buy SOL (180 pUSD quote units). within max notional and allowlist (copy_guardrail) (SIMULATED inference — set NEARAI_API_KEY for NEAR AI Cloud TEE model).",
+      "devnetTx": "4bbwtjvEZMvgDAtUwsnf7ZHaVQz4xRUnhuJ8sB51sWSQE69tpER1WaELqqpyjvCSfvYJdCqmFwpD95ZBYCgDWVUP"
+    }
+  ]
+}

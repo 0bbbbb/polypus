@@ -3,34 +3,39 @@ import "@fontsource/inter-tight/500.css";
 import "@fontsource/inter-tight/600.css";
 import "./styles.css";
 import { truncate } from "./fx/formats.js";
+import { formatNearYocto, formatUnits } from "./fx/amounts.js";
 import { decoder } from "./fx/decode.js";
 import {
-  RECORDED_AGENT,
   RECORDED_SETTLEMENTS,
-  RECORDED_SUB,
   RECORDED_TRADERS,
   RECORDED_TRADES,
+  REGISTRY_ID,
   pnlPercent,
 } from "./data/recorded.js";
 import { loadLiveTraders } from "./data/live.js";
-import type { Provenance, Trader } from "./data/types.js";
+import type { CheckoutQuote, Trader } from "./data/types.js";
 import { dryQuote } from "./near/oneclick.js";
 import { loadDevnetSettlements } from "./data/devnet.js";
 import { fetchFeedLive } from "./near/registry.js";
 import { chainSigForTrader } from "./near/chainsig.js";
-import { REGISTRY_ID } from "./data/recorded.js";
-
-const LIVE_FOLLOWER = "carol-18e5.testnet";
+import { fetchGatewaySlice } from "./near/nearaiBrowser.js";
+import { fetchSubscriptionLive, loadFollowerSnapshot } from "./data/followerLive.js";
+import { LIVE_FOLLOWER, LIVE_TRADER } from "./data/constants.js";
+import { statusChip, statusChipFromLive } from "./ui/chips.js";
+import { DEFAULT_GUARDRAILS } from "./data/guardrails.js";
 
 const app = document.getElementById("app")!;
+const liveOptOut = import.meta.env.VITE_LIVE === "0";
 let traders: Trader[] = RECORDED_TRADERS;
 let liveMode = false;
-let quotePreview: string = "Click refresh for a live dry quote (mainnet 1Click, no spend).";
+let liveFailed = false;
+let quotePreview: CheckoutQuote | null = null;
+let quoteError = "";
 
-function provBadge(p: Provenance): string {
-  if (p.kind === "live") return `<span class="prov prov--live">LIVE · ${p.network}</span>`;
-  if (p.kind === "recorded") return `<span class="prov">RECORDED · ${p.recordedAt.slice(0, 10)}</span>`;
-  return `<span class="prov prov--sim">SIMULATED</span>`;
+function shell(page: string, body: string, foot: string) {
+  return `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav(page)}</div></nav>
+  <main class="main">${body}</main>
+  <footer class="footer">${foot}</footer></div>`;
 }
 
 function route(): { page: string; id?: string } {
@@ -60,82 +65,108 @@ function nav(active: string) {
     .join("");
 }
 
-function traderCards(traders: Trader[]) {
-  return traders
+function attestationBar(t: Trader): string {
+  const m = t.pnl.attestation.measurement || t.pnl.attestation.signerPublicKey;
+  const kind = t.pnl.attestation.kind === "simulated" ? "simulated" : "live";
+  return `<div class="kc__att">
+    ${statusChip(kind === "live" ? "live" : "simulated", "Attested")}
+    <span class="kc__hash mono">${truncate(m)}</span>
+  </div>`;
+}
+
+function traderCards(list: Trader[]) {
+  return list
     .map((t, i) => {
       const pnl = pnlPercent(t.pnl.pnlBps);
-      return `<article class="kc" style="position:relative;margin-bottom:16px">
-        <header class="kc__head"><div class="kc__title"><span class="kc__rank">${i + 1}</span> ${t.handle} <span style="color:var(--ink-2);font-weight:400">· ${t.account}</span></div>
-        <span class="kc__tag kc__tag--live"><i class="dot"></i> Attested</span></header>
-        <div class="kc__lead kc__group"><div class="kc__big">${pnl}</div><div class="kc__sub">${t.pnl.tradeCount} trades · window through ${t.pnl.windowEnd.slice(0, 10)}</div>
-        ${provBadge(t.pnl.provenance)}</div>
-        <footer class="kc__foot"><div class="kc__price"><span>Key</span><b>${(Number(t.price.amount) / 1e24).toFixed(2)} NEAR / ${t.price.periodDays}d</b></div>
-        <a class="kc__btn" href="#/trader/${encodeURIComponent(t.account)}">View</a></footer>
+      return `<article class="kc">
+        <header class="kc__head"><div class="kc__title"><span class="kc__rank">${i + 1}</span> ${t.handle}
+        <span class="kc__who mono">${truncate(t.account)}</span></div>
+        <span class="kc__tag">${statusChipFromLive(t.pnl.provenance.kind === "live", "PnL")}</span></header>
+        <div class="kc__lead kc__group"><div class="kc__big">${pnl}</div>
+        <div class="kc__sub">${t.pnl.tradeCount} trades · through ${t.pnl.windowEnd.slice(0, 10)}</div>
+        ${attestationBar(t)}</div>
+        <footer class="kc__foot"><div class="kc__price"><span>Viewing key</span>
+        <b>${formatNearYocto(t.price.amount)} / ${t.price.periodDays}d</b></div>
+        <a class="kc__btn" href="#/trader/${encodeURIComponent(t.account)}">Open</a></footer>
       </article>`;
     })
     .join("");
 }
 
 function renderLeaderboard() {
-  const liveBanner = liveMode
-    ? `<div class="banner"><b>Live registry</b> on <span class="mono">polypus-keys-18e5.testnet</span> — PnL from on-chain statements when published.</div>`
-    : `<div class="banner banner--sim"><b>Fallback fixtures.</b> Run with <span class="mono">VITE_LIVE=1</span> for testnet traders + PnL.</div>`;
-  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("leaderboard")}</div></nav>
-  <main class="main"><h1 class="h2" style="margin-bottom:16px">Attested PnL, hidden trades</h1>
-  ${liveBanner}${traderCards(traders)}</main>
-  <footer class="footer">Built for NEAR HACKATHON · Chain Signatures · Intents · NEAR AI Cloud</footer></div>`;
+  const note = liveFailed
+    ? `<p class="banner banner--muted">${statusChip("simulated", "Offline")} Registry unreachable — showing recorded fixtures.</p>`
+    : liveMode
+      ? ""
+      : "";
+  const body = `<h1 class="h2">Attested performance. Trades stay sealed.</h1>
+  <p class="page-lead">Ranked by on-chain PnL statements. Activity and settlements stay encrypted until your agent decrypts inside a TEE.</p>
+  ${note}<div class="stack">${traderCards(traders)}</div>`;
+  const foot = liveMode
+    ? `${REGISTRY_ID} · testnet · ${statusChip("live", "Registry")}`
+    : "Built for NEAR HACKATHON · Chain Signatures · Intents";
+  app.innerHTML = shell("leaderboard", body, foot);
 }
 
 async function renderTrader(id: string) {
   const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
-  let feedNote = "";
+  let meta = "";
   if (liveMode) {
     const feed = await fetchFeedLive(t.account, 0, 8);
-    feedNote = feed.length
-      ? `<p class="kc__note"><span>On-chain feed</span><span>${feed.length} encrypted records · epoch ${feed[feed.length - 1]?.epoch ?? t.currentEpoch}</span></p>`
-      : `<p class="kc__note"><span>On-chain feed</span><span>empty — run <span class="mono">npm run demo:live</span></span></p>`;
     const cs = await chainSigForTrader(t.account, t.derivationPath || "solana-1");
+    meta = `<div class="kc__note"><span>Encrypted feed</span><span>${feed.length} records · epoch ${feed.at(-1)?.epoch ?? t.currentEpoch}</span></div>`;
     if (cs.solanaAddress) {
-      feedNote += `<p class="kc__note"><span>Chain Signatures</span><span class="mono">${truncate(cs.solanaAddress)} · ${cs.mpcContract}</span></p>`;
+      meta += `<div class="kc__note"><span>MPC Solana</span><span class="mono">${truncate(cs.solanaAddress)}</span></div>`;
     }
   }
   const rows = RECORDED_TRADES.filter(tr => tr.trader === t.account)
     .map(
-      tr => `<li class="is-hit"><div class="kc__fa"><b class="dec" data-dec>${tr.side.toUpperCase()} ${tr.base.symbol}</b><span class="dec" data-dec>${tr.quoteAmount} ${tr.quote.symbol}</span></div>
+      tr => `<li class="is-hit"><div class="kc__fa"><b class="dec" data-dec>${tr.side.toUpperCase()} ${tr.base.symbol}</b>
+      <span class="dec" data-dec>${formatUnits(tr.quoteAmount, tr.quote.decimals, tr.quote.symbol)}</span></div>
       <div class="kc__fv"><span class="mono dec" data-dec>${tr.price}</span><span class="mono dec" data-dec>${tr.executedAt.slice(11, 19)}Z</span></div></li>`,
     )
     .join("");
-  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("trader")}</div></nav>
-  <main class="main grid2"><div>${traderCards([t])}</div>
-  <div class="panel"><h2>Activity feed</h2><p>Public view: values redacted. Key holders decrypt inside the agent TEE.</p>
-  <article class="kc"><header class="kc__head"><div class="kc__title">${t.handle} · shielded</div><span class="kc__tag">Encrypted</span></header>
-  <ul class="kc__feed kc__group">${rows || "<li>No recorded trades</li>"}</ul>
-  <div class="kc__note"><span>poly1 address</span><span class="mono">${truncate(t.shieldedAddress)}</span></div></article>
-  ${feedNote}
-  <p style="margin-top:12px">${provBadge(liveMode ? { kind: "live", network: "near-testnet", ref: REGISTRY_ID } : (RECORDED_TRADES[0]?.provenance ?? { kind: "simulated", reason: "" }))}</p></div></main>
-  <footer class="footer">Solana settlements on devnet · RFQ desk stand-in for Confidential Intents</footer></div>`;
-  document.querySelectorAll<HTMLElement>("[data-dec]").forEach(el => {
-    const d = decoder(el);
-    d.set(0);
-  });
+  const body = `<div class="grid2"><div>${traderCards([t])}</div>
+  <article class="panel"><h2>Activity feed</h2>
+  <p>Public view: fields redacted. Subscribers decrypt inside the copy agent.</p>
+  <div class="kc"><header class="kc__head"><div class="kc__title">${t.handle} · shielded</div>
+  <span class="kc__tag">${statusChip("simulated", "Encrypted")}</span></header>
+  <ul class="kc__feed kc__group">${rows || "<li><span class=\"kc__fa\"><span>No public trades</span></span></li>"}</ul>
+  <div class="kc__note"><span>Receipt address</span><span class="mono">${truncate(t.shieldedAddress)}</span></div>
+  ${meta}</div></article></div>`;
+  app.innerHTML = shell("trader", body, "Solana devnet settlements · Polypus pool");
+  document.querySelectorAll<HTMLElement>("[data-dec]").forEach(el => decoder(el).set(0));
+}
+
+function quoteBlock(q: CheckoutQuote | null, err: string): string {
+  if (err) return `<p class="kc__note" style="box-shadow:none;color:var(--ink)">${err}</p>`;
+  if (!q) return `<p class="page-lead" style="margin:0;padding:16px 20px">Dry quote from mainnet 1Click — no wallet spend.</p>`;
+  return `<div class="kc__dl kc__group" style="padding-bottom:8px">
+    <div><dt>Pay in</dt><dd>${q.amountInFormatted} <span class="mono">${truncate(q.originAsset)}</span></dd></div>
+    <div><dt>Receive</dt><dd>${q.amountOutFormatted} NEAR</dd></div>
+    <div><dt>ETA</dt><dd>${q.timeEstimateSec ?? "—"}s · dry</dd></div>
+    <div><dt>Route</dt><dd>${statusChip("live", "1Click")}</dd></div>
+  </div>`;
 }
 
 function renderCheckout(id: string) {
   const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
-  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("checkout")}</div></nav>
-  <main class="main"><article class="kc" style="max-width:440px;margin:0 auto">
-  <header class="kc__head"><div class="kc__title">Buy key · ${t.handle}</div><span class="kc__tag">1Click</span></header>
-  <div class="kc__group"><div class="kc__pay"><div class="kc__amt">${(Number(t.price.amount) / 1e24).toFixed(2)}<small>NEAR</small></div><span class="kc__chip">30 days</span></div>
-  <div class="kc__route"><span class="kc__node is-on">Any chain</span><span class="kc__line"><i style="transform:scaleX(1)"></i></span><span class="kc__node is-on">Intents</span><span class="kc__line"><i style="transform:scaleX(0.6)"></i></span><span class="kc__node">Registry</span></div>
-  <p style="padding:16px 20px;font-size:13px;color:var(--ink-2)">${quotePreview}</p>
+  const body = `<article class="kc checkout-card">
+  <header class="kc__head"><div class="kc__title">Buy key · ${t.handle}</div><span class="kc__tag">${statusChip("live", "1Click")}</span></header>
+  <div class="kc__pay kc__group"><div class="kc__amt">${formatNearYocto(t.price.amount)}<small>/ ${t.price.periodDays}d</small></div>
+  <span class="kc__chip">Registry</span></div>
+  <div class="kc__route kc__group"><span class="kc__node is-on">Any chain</span><span class="kc__line"><i style="transform:scaleX(1)"></i></span>
+  <span class="kc__node is-on">Intents</span><span class="kc__line"><i style="transform:scaleX(0.85)"></i></span><span class="kc__node is-on">NEAR</span></div>
+  ${quoteBlock(quotePreview, quoteError)}
   <div style="padding:0 20px 16px;display:flex;gap:8px;flex-wrap:wrap">
   <button type="button" class="kc__btn" id="btn-quote">Refresh dry quote</button>
-  <button type="button" class="kc__btn kc__btn--wide is-done" disabled>Pay on testnet NEAR (wallet)</button></div>
-  <div class="kc__note"><span>Confidential Intents</span><span>Partner JWT required · shown as disabled in UI</span></div>
-  </div></article></main>
-  <footer class="footer">Live quotes hit mainnet 1Click with <span class="mono">dry:true</span> — no deposit</footer></div>`;
+  <button type="button" class="kc__btn kc__btn--wide is-done" disabled>Pay testnet NEAR</button></div>
+  <div class="kc__note"><span>Confidential Intents</span><span>${statusChip("simulated", "Partner JWT")}</span></div>
+  </article>`;
+  app.innerHTML = shell("checkout", body, "Quotes use dry:true on the public 1Click API");
   document.getElementById("btn-quote")?.addEventListener("click", async () => {
-    quotePreview = "Fetching…";
+    quoteError = "";
+    quotePreview = null;
     renderCheckout(id);
     const q = await dryQuote({
       originAsset: "nep141:wrap.near",
@@ -143,59 +174,112 @@ function renderCheckout(id: string) {
       amount: t.price.amount,
       recipient: t.account,
     });
-    quotePreview = q
-      ? `Dry quote: ${q.amountInFormatted} → ${q.amountOutFormatted} (live mainnet API)`
-      : "Quote failed — network or CORS; see README for curl fallback.";
+    if (!q) quoteError = "Quote failed — network or CORS.";
+    else quotePreview = q;
     renderCheckout(id);
   });
 }
 
+function dlRow(label: string, value: string, chip?: string): string {
+  return `<div><dt>${label}</dt><dd>${chip ?? ""}<span class="mono">${value}</span></dd></div>`;
+}
+
 async function renderFollower() {
-  const a = RECORDED_AGENT;
-  const sub = RECORDED_SUB;
-  const dev = await loadDevnetSettlements();
-  const latestCopy =
-    [...dev].reverse().find(s => (s as { label?: string }).label?.includes("follower")) ?? dev[dev.length - 1];
-  const copyLink =
-    latestCopy?.signature
-      ? `<a class="mono" href="https://explorer.solana.com/tx/${latestCopy.signature}?cluster=devnet" target="_blank" rel="noopener">${truncate(latestCopy.signature)}</a>`
-      : "run npm run demo:live";
-  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("follower")}</div></nav>
-  <main class="main grid2"><article class="kc"><header class="kc__head"><div class="kc__title">Copy agent</div><span class="kc__tag kc__tag--live"><i class="dot"></i> Online</span></header>
-  <div class="kc__group kc__dl"><div><dt>Follower</dt><dd class="mono">${sub.follower}</dd></div>
-  <div><dt>Trader</dt><dd class="mono">${sub.trader}</dd></div>
-  <div><dt>Agent key</dt><dd class="mono">${truncate(sub.agentPublicKey)}</dd></div>
-  <div><dt>Guardrails</dt><dd class="kc__chips"><i>max ${sub.guardrails.maxTradeQuote} quote</i><i>${sub.guardrails.copyRatioBps / 100}% size</i></dd></div></div>
-  <ul class="kc__feed kc__group">${a.decisions.map(d => `<li><div class="kc__fa"><b>${d.action}</b><span>${d.reason}</span></div><div class="kc__fv"><span class="mono">${d.at.slice(11, 19)}Z</span></div></li>`).join("")}</ul>
-  <div class="kc__note"><span>Latest devnet copy</span><span>${copyLink}</span></div>
-  <div class="kc__note">${provBadge(a.provenance)} · key never shown to human · ${liveMode ? LIVE_FOLLOWER : sub.follower}</div></article>
-  <div class="panel"><h2>Attestation</h2><p>${a.attestation.checks.map(c => `${c.ok ? "✓" : "○"} ${c.label}`).join("<br>")}</p>
-  ${provBadge(a.attestation.provenance)}</div></main>
-  <footer class="footer">Subscribe on NEAR testnet · epoch keys sealed to agent X25519 pubkey</footer></div>`;
+  const subLive = liveMode ? await fetchSubscriptionLive() : null;
+  const snap = liveMode ? await loadFollowerSnapshot() : null;
+  const gateway = await fetchGatewaySlice();
+  const trader = traders.find(x => x.account === LIVE_TRADER) ?? traders[0];
+  const agentPk = subLive?.agent_pubkey ?? snap?.agentPublicKey ?? "—";
+  const attDigest = subLive?.agent_attestation_digest ?? snap?.agentAttestationDigest ?? "—";
+  const gHash = subLive?.guardrails_hash ?? snap?.guardrailsHash ?? "—";
+  const maxQuote = formatUnits(DEFAULT_GUARDRAILS.maxTradeQuote, 6, "pUSD");
+  const ratio = `${DEFAULT_GUARDRAILS.copyRatioBps / 100}% notional`;
+
+  const decisions = snap?.decisions?.length
+    ? snap.decisions
+    : [];
+  const copiedRows =
+    decisions.length > 0
+      ? decisions
+          .map(d => {
+            const tx = d.devnetTx
+              ? `<a class="mono" href="https://explorer.solana.com/tx/${d.devnetTx}?cluster=devnet" target="_blank" rel="noopener">${truncate(d.devnetTx)}</a>`
+              : "—";
+            return `<li><div class="kc__ct"><b>${d.action} ${d.side} ${d.symbol}</b><small>${d.quoteHuman} · ${d.reason}</small></div>
+            <div class="kc__cs">${tx}</div></li>`;
+          })
+          .join("")
+      : `<li class="kc__fa"><span>Run <span class="mono">npm run demo:live</span> to populate feed.</span></li>`;
+
+  const attRows = `
+    <article class="kc"><header class="kc__head"><div class="kc__title">Attestation</div>
+    ${statusChip(gateway.ok ? "live" : "simulated", "Gateway")}</header>
+    <div class="kc__dl kc__group">
+    ${dlRow("Vendor", "NEAR AI Cloud", statusChip(gateway.ok ? "live" : "simulated"))}
+    ${dlRow("Gateway signer", gateway.signingAddress ? truncate(gateway.signingAddress) : "—")}
+    ${dlRow("Quote digest", gateway.quoteDigest ? truncate(gateway.quoteDigest) : "—")}
+    ${dlRow("Agent digest", truncate(attDigest))}
+    ${dlRow("Guardrails hash", truncate(gHash))}
+    ${dlRow("PnL attestor", trader.pnl.attestation.signerPublicKey ? truncate(trader.pnl.attestation.signerPublicKey) : "—")}
+    ${dlRow("Fetched", gateway.fetchedAt.slice(11, 19) + "Z")}
+    </div>
+    <p style="padding:12px 20px 16px;font-size:12px;color:var(--ink-2)">Key material never leaves the agent runtime. Human sees copied settlements only.</p>
+    </article>`;
+
+  const agentCard = `<article class="kc"><header class="kc__head"><div class="kc__title">Copy agent</div>
+    ${statusChip(liveMode ? "live" : "simulated", liveMode ? "Online" : "Fixture")}</header>
+    <div class="kc__dl kc__group">
+    <div><dt>Follower</dt><dd class="mono">${LIVE_FOLLOWER}</dd></div>
+    <div><dt>Trader</dt><dd class="mono">${LIVE_TRADER}</dd></div>
+    <div><dt>Agent X25519</dt><dd class="mono">${truncate(agentPk)}</dd></div>
+    <div><dt>Guardrails</dt><dd class="kc__chips"><i>max ${maxQuote}</i><i>${ratio}</i><i>${DEFAULT_GUARDRAILS.allowedTokens.join(" · ")}</i></dd></div>
+    </div>
+    <header class="kc__glabel kc__group" style="padding-top:12px"><span>Decrypted feed</span>
+    ${statusChip(snap ? "live" : "simulated", snap ? "Agent TEE" : "Awaiting sync")}</header>
+    <ul class="kc__copied kc__group">${copiedRows}</ul>
+    </article>`;
+
+  const explain = decisions[decisions.length - 1]?.explanation;
+  const explainPanel = explain
+    ? `<article class="panel" style="margin-top:0"><h2>Agent note</h2><p style="color:var(--ink);font-size:14px;margin:0">${explain}</p>
+    <p style="margin-top:12px;margin-bottom:0">${statusChip(snap ? "live" : "simulated", "Inference")}</p></article>`
+    : "";
+
+  const body = `<div class="grid2 grid2--balanced">${agentCard}${attRows}</div>${explainPanel}`;
+  app.innerHTML = shell("follower", body, "Epoch keys sealed to agent pubkey on subscribe");
 }
 
 async function renderExplorer(id: string) {
   const dev = await loadDevnetSettlements();
-  const s = dev[0] ?? RECORDED_SETTLEMENTS[0];
-  app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("explorer")}</div></nav>
-  <main class="main grid2"><div class="panel"><h2>Public settlement</h2><p>Redacted explorer view — no amounts or tokens.</p>
-  <div class="kc__dl"><div><dt>Signature</dt><dd class="mono">${truncate(s.signature)}</dd></div>
-  <div><dt>Slot</dt><dd class="mono">${s.slot}</dd></div>
-  <div><dt>Nullifiers</dt><dd class="mono">${truncate(s.nullifiers[0])}</dd></div>
-  <div><dt>Commitments</dt><dd class="mono">${truncate(s.commitments[0])}</dd></div></div>
-  ${provBadge(s.provenance)}</div>
-  <div class="panel"><h2>Key holder view</h2><p>Decrypted trade records appear in the agent after settlement (demo: see Follower).</p>
-  ${RECORDED_TRADES.map(tr => `<div style="margin-top:8px;font-size:13px"><b>${tr.side} ${tr.base.symbol}</b> · ${tr.baseAmount} @ ${tr.price}</div>`).join("")}
-  </div></main>
-  <footer class="footer">Polypus pool on Solana devnet (UNAUDITED)</footer></div>`;
+  const s = dev.at(-1) ?? RECORDED_SETTLEMENTS[0];
+  const body = `<div class="grid2 grid2--balanced">
+  <article class="panel"><h2>Public settlement</h2><p>Redacted explorer — signatures and Merkle artifacts only.</p>
+  <div class="kc__dl">
+  ${dlRow("Signature", truncate(s.signature))}
+  ${dlRow("Pool", truncate(s.pool))}
+  ${dlRow("Nullifier", truncate(s.nullifiers[0]))}
+  ${dlRow("Commitment", truncate(s.commitments[0]))}
+  </div>
+  <p style="margin-top:16px">${statusChip("live", "devnet")}</p></article>
+  <article class="panel"><h2>Key holder view</h2><p>Decrypted trade rows appear on the Follower screen after the agent copies.</p>
+  <ul class="kc__feed">${RECORDED_TRADES.slice(0, 3).map(tr => `<li><div class="kc__fa"><b>${tr.side} ${tr.base.symbol}</b>
+  <span>${formatUnits(tr.baseAmount, tr.base.decimals, tr.base.symbol)}</span></div></li>`).join("")}</ul>
+  </article></div>`;
+  app.innerHTML = shell("explorer", body, "Polypus pool · UNAUDITED devnet");
 }
 
 async function refreshLive() {
-  if (import.meta.env.VITE_LIVE !== "1") return;
-  const live = await loadLiveTraders();
-  if (live.length) {
-    traders = live;
-    liveMode = true;
+  if (liveOptOut) return;
+  try {
+    const live = await loadLiveTraders();
+    if (live.length) {
+      traders = live;
+      liveMode = true;
+      liveFailed = false;
+    }
+  } catch {
+    liveFailed = true;
+    liveMode = false;
   }
 }
 

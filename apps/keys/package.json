@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5174 --host 127.0.0.1",
+    "dev": "VITE_LIVE=1 vite --port 5174 --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4174",
     "screenshots": "node tools/screenshots.mjs",

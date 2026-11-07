@@ -71,6 +71,7 @@ export async function dryQuote(params: {
   const data = await res.json() as { quote?: Record<string, string>; quoteRequest?: { dry?: boolean } };
   const q = data.quote;
   if (!q) return null;
+  const timeEstimate = Number(q.timeEstimate ?? q.time_estimate ?? 0);
   return {
     originAsset: params.originAsset,
     originChain: params.originAsset.includes("eth") ? "eth" : params.originAsset.includes("sol") ? "sol" : "near",
@@ -79,6 +80,7 @@ export async function dryQuote(params: {
     destinationAsset: params.destinationAsset,
     amountOut: q.amountOut ?? "",
     amountOutFormatted: q.amountOutFormatted ?? "",
+    timeEstimateSec: Number.isFinite(timeEstimate) ? timeEstimate : undefined,
     dry: true,
     raw: data,
   };
