@@ -1,5 +1,6 @@
 import { viewCall } from "../near/registry.js";
 import { LIVE_FOLLOWER, LIVE_TRADER } from "./constants.js";
+import bundledSnapshot from "../../public/live/follower-snapshot.json";
 
 export type SubOnChain = {
   follower: string;
@@ -38,9 +39,9 @@ export async function fetchSubscriptionLive(
 export async function loadFollowerSnapshot(): Promise<FollowerSnapshot | null> {
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}live/follower-snapshot.json`);
-    if (!res.ok) return null;
-    return (await res.json()) as FollowerSnapshot;
+    if (res.ok) return (await res.json()) as FollowerSnapshot;
   } catch {
-    return null;
+    /* use bundled copy */
   }
+  return bundledSnapshot as FollowerSnapshot;
 }

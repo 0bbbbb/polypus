@@ -190,9 +190,9 @@ async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 }
 
 async function renderFollower() {
-  app.innerHTML = shell("follower", `<p class="page-lead">Loading copy agent…</p>`, "NEAR testnet");
+  try {
   const subLive = wantLive ? await withTimeout(fetchSubscriptionLive(), 12_000, null) : null;
-  const snap = wantLive ? await withTimeout(loadFollowerSnapshot(), 4_000, null) : null;
+  const snap = wantLive ? await loadFollowerSnapshot() : null;
   const gateway = await withTimeout(fetchGatewaySlice(), 8_000, {
     ok: false,
     signingAddress: "",
@@ -260,6 +260,9 @@ async function renderFollower() {
 
   const body = `<div class="grid2 grid2--balanced">${agentCard}${attRows}</div>${explainPanel}`;
   app.innerHTML = shell("follower", body, "Epoch keys sealed to agent pubkey on subscribe");
+  } catch (e) {
+    app.innerHTML = shell("follower", `<p class="page-lead">Follower view error: ${String(e)}</p>`, "");
+  }
 }
 
 async function renderExplorer(id: string) {

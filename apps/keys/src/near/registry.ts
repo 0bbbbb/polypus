@@ -3,6 +3,7 @@ import { REGISTRY_ID } from "../data/recorded.js";
 const RPC = import.meta.env.VITE_NEAR_RPC ?? "https://rpc.testnet.near.org";
 
 export async function viewCall<T>(method: string, args: Record<string, unknown>): Promise<T | null> {
+  try {
   const argsJson = JSON.stringify(args);
   const argsBase64 = btoa(String.fromCharCode(...new TextEncoder().encode(argsJson)));
   const body = {
@@ -23,6 +24,9 @@ export async function viewCall<T>(method: string, args: Record<string, unknown>)
   const text = new TextDecoder().decode(Uint8Array.from(json.result.result));
   try {
     return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
   } catch {
     return null;
   }
