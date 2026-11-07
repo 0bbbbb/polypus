@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-/** PnL attestor (SIMULATED TEE). Signs statement and calls publish_pnl on registry. */
+/** PnL attestor: simulated OutLayer stand-in; gateway attestation when reachable. */
 import { accountFor, view, tg } from "../shared/near.js";
 import { TRADER, REGISTRY } from "../shared/config.js";
 import { canonicalStatement, loadOrCreateAttestorSecret, signStatement, type PnlStatement } from "../shared/pnl.js";
+import { attestationQuoteDigest, fetchAttestationReport, randomNonceHex, attestationNonceOk } from "../shared/nearai.js";
 import { ed25519 } from "@noble/curves/ed25519";
 import { base58 } from "@scure/base";
 import fs from "node:fs";
@@ -25,6 +26,21 @@ async function main() {
     slot = 1;
   }
 
+  let attestationKind: PnlStatement["attestation_kind"] = "simulated";
+  let codeHash = "simulated-attestor-v0";
+  let attestorDigest = "simulated-tee-v0";
+  try {
+    const nonce = randomNonceHex();
+    const report = await fetchAttestationReport(nonce);
+    if (attestationNonceOk(report, nonce)) {
+      codeHash = attestationQuoteDigest(report);
+      attestorDigest = `nearai-gw-${codeHash.slice(0, 24)}`;
+      console.log("NEAR AI gateway attestation ok (keyless); PnL scan still SIMULATED locally");
+    }
+  } catch {
+    console.log("Attestor TEE: SIMULATED (gateway attestation unreachable)");
+  }
+
   const now = new Date();
   const statement: PnlStatement = {
     v: 1,
@@ -36,8 +52,8 @@ async function main() {
     pool,
     scanned_to_slot: slot,
     notes_scanned: 12,
-    code_hash: "simulated-attestor-v0",
-    attestation_kind: "simulated",
+    code_hash: codeHash,
+    attestation_kind: attestationKind,
   };
   const canon = canonicalStatement(statement);
   const sig = signStatement(sk, canon);
@@ -48,7 +64,7 @@ async function main() {
     await alice.functionCall({
       contractId: REGISTRY,
       methodName: "set_attestor",
-      args: { attestor_pubkey: pk, attestor_attestation_digest: "simulated-tee-v0" },
+      args: { attestor_pubkey: pk, attestor_attestation_digest: attestorDigest },
       gas: tg(40),
       attachedDeposit: 0n,
     });

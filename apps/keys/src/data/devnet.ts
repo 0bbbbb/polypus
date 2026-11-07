@@ -12,8 +12,9 @@ export async function loadDevnetSettlements(): Promise<RedactedSettlement[]> {
       explorer_base?: string;
     };
     if (d.network !== "devnet") return [];
-    return (d.signatures ?? []).map((s, i) => ({
+    return (d.signatures ?? []).map(s => ({
       signature: s.sig,
+      label: s.label,
       slot: 0,
       blockTime: new Date().toISOString(),
       pool: d.pool ?? "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",

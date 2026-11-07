@@ -48,3 +48,9 @@ export type TraderOnChain = {
 export async function fetchTradersLive(): Promise<TraderOnChain[]> {
   return (await viewCall<TraderOnChain[]>("get_traders", { from_index: 0, limit: 20 })) ?? [];
 }
+
+export type FeedRow = { seq: number; epoch: number; ciphertext: string; posted_at: string };
+
+export async function fetchFeedLive(trader: string, fromSeq = 0, limit = 20): Promise<FeedRow[]> {
+  return (await viewCall<FeedRow[]>("get_feed", { trader, from_seq: fromSeq, limit })) ?? [];
+}

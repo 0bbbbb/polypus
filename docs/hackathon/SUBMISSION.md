@@ -25,7 +25,8 @@ Polypus Keys is private copy-trading for the NEAR ecosystem: traders keep positi
 ## Demo assets
 
 - App: `npm run app` → http://127.0.0.1:5174
-- End-to-end script: `npm run demo`
+- End-to-end script: `npm run demo` · live agent loop: `npm run demo:live`
+- Gap list: `docs/hackathon/STATUS.md`
 - Screenshots: `apps/keys/screenshots/` (after `npm run screenshots -w apps/keys`)
 
 ## Prior work disclosure

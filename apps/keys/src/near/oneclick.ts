@@ -2,6 +2,43 @@ import type { CheckoutQuote } from "../data/types.js";
 
 const BASE = "https://1click.chaindefuser.com";
 
+/** Confidential quote probe (requires ONECLICK_PARTNER_JWT server-side; browser stays dry-only). */
+export async function confidentialQuoteProbe(params: {
+  originAsset: string;
+  destinationAsset: string;
+  amount: string;
+  recipient: string;
+  partnerJwt: string;
+}): Promise<{ ok: boolean; detail: string }> {
+  const deadline = new Date(Date.now() + 30 * 60_000).toISOString();
+  const body = {
+    dry: true,
+    swapType: "EXACT_INPUT",
+    slippageTolerance: 100,
+    originAsset: params.originAsset,
+    depositType: "ORIGIN_CHAIN",
+    destinationAsset: params.destinationAsset,
+    amount: params.amount,
+    refundTo: params.recipient,
+    refundType: "DESTINATION_CHAIN",
+    recipient: params.recipient,
+    recipientType: "DESTINATION_CHAIN",
+    deadline,
+    confidentiality: "basic",
+  };
+  const res = await fetch(`${BASE}/v0/quote`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${params.partnerJwt}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) return { ok: true, detail: "Partner JWT accepted for confidential dry quote" };
+  const err = await res.text();
+  return { ok: false, detail: err.slice(0, 120) || `HTTP ${res.status}` };
+}
+
 /** Real mainnet 1Click dry quote (no wallet spend). */
 export async function dryQuote(params: {
   originAsset: string;

@@ -16,6 +16,11 @@ import { loadLiveTraders } from "./data/live.js";
 import type { Provenance, Trader } from "./data/types.js";
 import { dryQuote } from "./near/oneclick.js";
 import { loadDevnetSettlements } from "./data/devnet.js";
+import { fetchFeedLive } from "./near/registry.js";
+import { chainSigForTrader } from "./near/chainsig.js";
+import { REGISTRY_ID } from "./data/recorded.js";
+
+const LIVE_FOLLOWER = "carol-18e5.testnet";
 
 const app = document.getElementById("app")!;
 let traders: Trader[] = RECORDED_TRADERS;
@@ -81,8 +86,19 @@ function renderLeaderboard() {
   <footer class="footer">Built for NEAR HACKATHON · Chain Signatures · Intents · NEAR AI Cloud</footer></div>`;
 }
 
-function renderTrader(id: string) {
+async function renderTrader(id: string) {
   const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
+  let feedNote = "";
+  if (liveMode) {
+    const feed = await fetchFeedLive(t.account, 0, 8);
+    feedNote = feed.length
+      ? `<p class="kc__note"><span>On-chain feed</span><span>${feed.length} encrypted records · epoch ${feed[feed.length - 1]?.epoch ?? t.currentEpoch}</span></p>`
+      : `<p class="kc__note"><span>On-chain feed</span><span>empty — run <span class="mono">npm run demo:live</span></span></p>`;
+    const cs = await chainSigForTrader(t.account, t.derivationPath || "solana-1");
+    if (cs.solanaAddress) {
+      feedNote += `<p class="kc__note"><span>Chain Signatures</span><span class="mono">${truncate(cs.solanaAddress)} · ${cs.mpcContract}</span></p>`;
+    }
+  }
   const rows = RECORDED_TRADES.filter(tr => tr.trader === t.account)
     .map(
       tr => `<li class="is-hit"><div class="kc__fa"><b class="dec" data-dec>${tr.side.toUpperCase()} ${tr.base.symbol}</b><span class="dec" data-dec>${tr.quoteAmount} ${tr.quote.symbol}</span></div>
@@ -95,7 +111,8 @@ function renderTrader(id: string) {
   <article class="kc"><header class="kc__head"><div class="kc__title">${t.handle} · shielded</div><span class="kc__tag">Encrypted</span></header>
   <ul class="kc__feed kc__group">${rows || "<li>No recorded trades</li>"}</ul>
   <div class="kc__note"><span>poly1 address</span><span class="mono">${truncate(t.shieldedAddress)}</span></div></article>
-  <p style="margin-top:12px">${provBadge(RECORDED_TRADES[0]?.provenance ?? { kind: "simulated", reason: "" })}</p></div></main>
+  ${feedNote}
+  <p style="margin-top:12px">${provBadge(liveMode ? { kind: "live", network: "near-testnet", ref: REGISTRY_ID } : (RECORDED_TRADES[0]?.provenance ?? { kind: "simulated", reason: "" }))}</p></div></main>
   <footer class="footer">Solana settlements on devnet · RFQ desk stand-in for Confidential Intents</footer></div>`;
   document.querySelectorAll<HTMLElement>("[data-dec]").forEach(el => {
     const d = decoder(el);
@@ -133,9 +150,16 @@ function renderCheckout(id: string) {
   });
 }
 
-function renderFollower() {
+async function renderFollower() {
   const a = RECORDED_AGENT;
   const sub = RECORDED_SUB;
+  const dev = await loadDevnetSettlements();
+  const latestCopy =
+    [...dev].reverse().find(s => (s as { label?: string }).label?.includes("follower")) ?? dev[dev.length - 1];
+  const copyLink =
+    latestCopy?.signature
+      ? `<a class="mono" href="https://explorer.solana.com/tx/${latestCopy.signature}?cluster=devnet" target="_blank" rel="noopener">${truncate(latestCopy.signature)}</a>`
+      : "run npm run demo:live";
   app.innerHTML = `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav("follower")}</div></nav>
   <main class="main grid2"><article class="kc"><header class="kc__head"><div class="kc__title">Copy agent</div><span class="kc__tag kc__tag--live"><i class="dot"></i> Online</span></header>
   <div class="kc__group kc__dl"><div><dt>Follower</dt><dd class="mono">${sub.follower}</dd></div>
@@ -143,7 +167,8 @@ function renderFollower() {
   <div><dt>Agent key</dt><dd class="mono">${truncate(sub.agentPublicKey)}</dd></div>
   <div><dt>Guardrails</dt><dd class="kc__chips"><i>max ${sub.guardrails.maxTradeQuote} quote</i><i>${sub.guardrails.copyRatioBps / 100}% size</i></dd></div></div>
   <ul class="kc__feed kc__group">${a.decisions.map(d => `<li><div class="kc__fa"><b>${d.action}</b><span>${d.reason}</span></div><div class="kc__fv"><span class="mono">${d.at.slice(11, 19)}Z</span></div></li>`).join("")}</ul>
-  <div class="kc__note">${provBadge(a.provenance)} · key never shown to human</div></article>
+  <div class="kc__note"><span>Latest devnet copy</span><span>${copyLink}</span></div>
+  <div class="kc__note">${provBadge(a.provenance)} · key never shown to human · ${liveMode ? LIVE_FOLLOWER : sub.follower}</div></article>
   <div class="panel"><h2>Attestation</h2><p>${a.attestation.checks.map(c => `${c.ok ? "✓" : "○"} ${c.label}`).join("<br>")}</p>
   ${provBadge(a.attestation.provenance)}</div></main>
   <footer class="footer">Subscribe on NEAR testnet · epoch keys sealed to agent X25519 pubkey</footer></div>`;
@@ -176,9 +201,9 @@ async function refreshLive() {
 
 async function render() {
   const { page, id } = route();
-  if (page === "trader") renderTrader(id ?? traders[0].account);
+  if (page === "trader") await renderTrader(id ?? traders[0].account);
   else if (page === "checkout") renderCheckout(id ?? traders[0].account);
-  else if (page === "follower") renderFollower();
+  else if (page === "follower") await renderFollower();
   else if (page === "explorer") await renderExplorer(id ?? "");
   else renderLeaderboard();
 }

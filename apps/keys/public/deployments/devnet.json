@@ -32,13 +32,25 @@
     }
   ],
   "chain_domain": "fbc1be44a2adbdd352148e9601b67b8b8684032bd9afbad59c46f348c3585650",
+  "chain_signatures": {
+    "domain_id": 1,
+    "explorer_near": "https://explorer.testnet.near.org/transactions/A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN",
+    "explorer_solana": "https://explorer.solana.com/tx/ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH?cluster=devnet",
+    "fund_transfer_sig": "X2MkWNo6cTntSd8zS4UDHMQYhLXJdXgS3VxdE77ECrPaisLiJS3vBZrNb12jGnPYBmsQ12h7WQdvyG3xB2k6Z7N",
+    "mpc_contract": "v1.signer-prod.testnet",
+    "near_account": "carol-18e5.testnet",
+    "near_sign_tx": "A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN",
+    "path": "solana-1",
+    "solana_address": "6QWKrdhdQSywsM8xbT5TcJaznaFPM2r4kcN4Dzr2YNxw",
+    "solana_tx_sig": "ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH"
+  },
   "explorer_base": "https://explorer.solana.com/tx/{sig}?cluster=devnet",
   "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
   "mint": "DNrrGhSQVgh6DYgzwc1qPiMsbnwAxnfJGMLjpwodPHkY",
   "network": "devnet",
   "pool": "DiUrcxwcsYMGnPGioyeL4hyRUqwn1DL1kZv7VxGdF6Em",
-  "program_id": "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",
   "program_deploy_sig": "3baJxPpNpx6NqWjsizZdwk5TcBsyrq4CzurFJn4fGzt1HzKpn9q9pa3wH3f2Z9EoXykK5zLN9ARTEYjEfyrbt1Uk",
+  "program_id": "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj",
   "rpc": "https://api.devnet.solana.com",
   "signatures": [
     {
@@ -80,20 +92,20 @@
     {
       "label": "chain_signatures_transfer",
       "sig": "ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH"
+    },
+    {
+      "label": "keys_follower_copy",
+      "sig": "5NZUvZvRHjA7A4Nw9RRvZ3kkHuSVAvb73K83CHFuLEgANCYNLpE9gBtEZuaRGYFhCf2cDS3SQLRNhotzJGt9gDxm"
+    },
+    {
+      "label": "keys_trader_trade",
+      "sig": "xf5WS56uxCpHbgtxvkLvkKjNKHNvomGWjfJRGo41HjRwDkgVqKcFJABJtmpnw7VgmzNftyNCRDJRysWr9sVrDKZ"
+    },
+    {
+      "label": "keys_follower_copy",
+      "sig": "4bbwtjvEZMvgDAtUwsnf7ZHaVQz4xRUnhuJ8sB51sWSQE69tpER1WaELqqpyjvCSfvYJdCqmFwpD95ZBYCgDWVUP"
     }
   ],
   "tree": "ghaTQmA86N3Xb5HQjGosNLDTPHqV2m1iWqhhCX26BFA",
-  "vault": "EB5aEEXFCAsPqDvsSMGULw2oRJPNnj2MQiA9xwQX4gao",
-  "chain_signatures": {
-    "near_account": "carol-18e5.testnet",
-    "mpc_contract": "v1.signer-prod.testnet",
-    "path": "solana-1",
-    "domain_id": 1,
-    "solana_address": "6QWKrdhdQSywsM8xbT5TcJaznaFPM2r4kcN4Dzr2YNxw",
-    "fund_transfer_sig": "X2MkWNo6cTntSd8zS4UDHMQYhLXJdXgS3VxdE77ECrPaisLiJS3vBZrNb12jGnPYBmsQ12h7WQdvyG3xB2k6Z7N",
-    "solana_tx_sig": "ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH",
-    "near_sign_tx": "A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN",
-    "explorer_solana": "https://explorer.solana.com/tx/ahjK7TiU24SPJzTBrzdovgwRMNj7So4zCdwCXuM4H5577ojGro1n8hJua1yCBKyg6Lgr7XFWmb2F8YoQegLXpVH?cluster=devnet",
-    "explorer_near": "https://explorer.testnet.near.org/transactions/A4g7tABd42QVXRR2pMbPwZdVCAuu1tK92TPFJy4ScigN"
-  }
+  "vault": "EB5aEEXFCAsPqDvsSMGULw2oRJPNnj2MQiA9xwQX4gao"
 }

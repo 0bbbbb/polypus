@@ -11,6 +11,7 @@ cd polypus
 source scripts/env.sh          # optional pinned toolchain
 npm install
 npm run demo                   # protocol tests + app build + NEAR keys e2e
+npm run demo:live              # agents loop + Solana explorer links (testnet/devnet)
 VITE_LIVE=1 npm run app         # http://127.0.0.1:5174
 ```
 
@@ -32,7 +33,7 @@ Judge quickstart: [docs/hackathon/README_KEYS.md](docs/hackathon/README_KEYS.md)
 | **Chain Signatures** → Solana ed25519 | **Real** — MPC-signed **devnet** transfer (`deployments/devnet.json` → `chain_signatures`) | [scripts/chainsig-devnet.mjs](scripts/chainsig-devnet.mjs) |
 | **1Click / Intents** dry quotes | **Real** (mainnet API) | [apps/keys/src/near/oneclick.ts](apps/keys/src/near/oneclick.ts) |
 | Encrypted feed + epoch keys | **Real** on registry | [sdk/src/feedcrypto.ts](sdk/src/feedcrypto.ts), [agents/](agents/) |
-| PnL attestor + follower agent TEE | **SIMULATED** locally | [agents/attestor/](agents/attestor/), [agents/follower/](agents/follower/) — needs `NEARAI_API_KEY` / OutLayer for live TEE |
+| PnL attestor + follower agent TEE | **SIMULATED** scan/key-hold; **live** NEAR AI gateway attestation (keyless) | [agents/attestor/](agents/attestor/), [agents/follower/](agents/follower/), [agents/shared/nearai.ts](agents/shared/nearai.ts) — `NEARAI_API_KEY` for live inference text |
 | Confidential Intents checkout | **Not wired** (Partner JWT) | UI label |
 | Polypus pool on Solana devnet | **Real** — program `PoLYdUX…`, Groth16 deposits/transfers/withdraws + Keys agent deposits | [deployments/devnet.json](deployments/devnet.json) |
 

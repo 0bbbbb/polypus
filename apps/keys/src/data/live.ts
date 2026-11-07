@@ -5,7 +5,20 @@ import { pnlPercent } from "./recorded.js";
 function parsePnl(t: TraderOnChain): AttestedPnl | undefined {
   if (!t.latest_pnl_statement) return undefined;
   try {
-    const st = JSON.parse(t.latest_pnl_statement) as { pnl_bps?: number; trade_count?: number; window_start?: string; window_end?: string };
+    const st = JSON.parse(t.latest_pnl_statement) as {
+      pnl_bps?: number;
+      trade_count?: number;
+      window_start?: string;
+      window_end?: string;
+      attestation_kind?: string;
+      code_hash?: string;
+    };
+    const attKind =
+      st.attestation_kind === "outlayer-tdx"
+        ? "dstack-tdx"
+        : st.code_hash?.startsWith("nearai") || t.attestor_attestation_digest.startsWith("nearai")
+          ? "near-ai-cloud"
+          : "simulated";
     return {
       trader: t.account,
       pnlBps: st.pnl_bps ?? 0,
@@ -15,10 +28,10 @@ function parsePnl(t: TraderOnChain): AttestedPnl | undefined {
       statementHash: "",
       signature: t.latest_pnl_signature,
       attestation: {
-        kind: "simulated",
+        kind: attKind as "near-ai-cloud" | "dstack-tdx" | "simulated",
         signerPublicKey: t.attestor_pubkey,
         nonce: "",
-        measurement: t.attestor_attestation_digest,
+        measurement: st.code_hash ?? t.attestor_attestation_digest,
         quoteDigest: "",
         checks: [{ label: "On-chain ed25519 verify", ok: !!t.latest_pnl_signature, detail: "registry publish_pnl" }],
         fetchedAt: new Date().toISOString(),

@@ -6,7 +6,8 @@
   "scripts": {
     "attestor": "tsx attestor/index.ts",
     "trader": "tsx trader-node/index.ts",
-    "follower": "tsx follower/index.ts"
+    "follower": "tsx follower/index.ts",
+    "test": "tsx --test test/guardrails.test.ts"
   },
   "dependencies": {
     "@noble/curves": "^1.9.0",

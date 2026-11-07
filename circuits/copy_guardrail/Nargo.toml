@@ -1,0 +1,7 @@
+[package]
+name = "copy_guardrail"
+type = "bin"
+authors = ["Polypus Keys"]
+compiler_version = ">=1.0.0"
+
+[dependencies]

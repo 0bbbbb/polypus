@@ -14,7 +14,8 @@
     "app": "npm run dev -w apps/keys",
     "build": "npm run build -w apps/keys",
     "test": "npm test --workspaces --if-present",
-    "demo": "bash scripts/demo.sh"
+    "demo": "bash scripts/demo.sh",
+    "demo:live": "bash scripts/demo-live.sh"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4"
