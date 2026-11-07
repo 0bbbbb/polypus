@@ -37,7 +37,7 @@ export async function fetchSubscriptionLive(
 
 export async function loadFollowerSnapshot(): Promise<FollowerSnapshot | null> {
   try {
-    const res = await fetch("./live/follower-snapshot.json");
+    const res = await fetch(`${import.meta.env.BASE_URL}live/follower-snapshot.json`);
     if (!res.ok) return null;
     return (await res.json()) as FollowerSnapshot;
   } catch {

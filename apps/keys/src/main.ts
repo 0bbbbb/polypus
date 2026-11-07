@@ -25,10 +25,11 @@ import { statusChip, statusChipFromLive } from "./ui/chips.js";
 import { DEFAULT_GUARDRAILS } from "./data/guardrails.js";
 
 const app = document.getElementById("app")!;
-const liveOptOut = import.meta.env.VITE_LIVE === "0";
+const wantLive = import.meta.env.VITE_LIVE !== "0";
 let traders: Trader[] = RECORDED_TRADERS;
 let liveMode = false;
 let liveFailed = false;
+let liveReady = false;
 let quotePreview: CheckoutQuote | null = null;
 let quoteError = "";
 
@@ -184,10 +185,22 @@ function dlRow(label: string, value: string, chip?: string): string {
   return `<div><dt>${label}</dt><dd>${chip ?? ""}<span class="mono">${value}</span></dd></div>`;
 }
 
+async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))]);
+}
+
 async function renderFollower() {
-  const subLive = liveMode ? await fetchSubscriptionLive() : null;
-  const snap = liveMode ? await loadFollowerSnapshot() : null;
-  const gateway = await fetchGatewaySlice();
+  app.innerHTML = shell("follower", `<p class="page-lead">Loading copy agent…</p>`, "NEAR testnet");
+  const subLive = wantLive ? await withTimeout(fetchSubscriptionLive(), 12_000, null) : null;
+  const snap = wantLive ? await withTimeout(loadFollowerSnapshot(), 4_000, null) : null;
+  const gateway = await withTimeout(fetchGatewaySlice(), 8_000, {
+    ok: false,
+    signingAddress: "",
+    quoteDigest: "",
+    nonce: "",
+    fetchedAt: new Date().toISOString(),
+  });
+  const showingLive = wantLive && !!(subLive || snap || liveMode);
   const trader = traders.find(x => x.account === LIVE_TRADER) ?? traders[0];
   const agentPk = subLive?.agent_pubkey ?? snap?.agentPublicKey ?? "—";
   const attDigest = subLive?.agent_attestation_digest ?? snap?.agentAttestationDigest ?? "—";
@@ -227,7 +240,7 @@ async function renderFollower() {
     </article>`;
 
   const agentCard = `<article class="kc"><header class="kc__head"><div class="kc__title">Copy agent</div>
-    ${statusChip(liveMode ? "live" : "simulated", liveMode ? "Online" : "Fixture")}</header>
+    ${statusChip(showingLive ? "live" : "simulated", showingLive ? "Online" : "Fixture")}</header>
     <div class="kc__dl kc__group">
     <div><dt>Follower</dt><dd class="mono">${LIVE_FOLLOWER}</dd></div>
     <div><dt>Trader</dt><dd class="mono">${LIVE_TRADER}</dd></div>
@@ -269,17 +282,24 @@ async function renderExplorer(id: string) {
 }
 
 async function refreshLive() {
-  if (liveOptOut) return;
+  if (!wantLive) {
+    liveReady = true;
+    return;
+  }
   try {
     const live = await loadLiveTraders();
     if (live.length) {
       traders = live;
       liveMode = true;
       liveFailed = false;
+    } else {
+      liveFailed = true;
     }
   } catch {
     liveFailed = true;
     liveMode = false;
+  } finally {
+    liveReady = true;
   }
 }
 

@@ -7,11 +7,11 @@ import { fileURLToPath } from "node:url";
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(__dir, "../screenshots");
 const routes = [
-  ["leaderboard", "#/leaderboard"],
-  ["trader", "#/trader/alice-18e5.testnet"],
-  ["checkout", "#/checkout/alice-18e5.testnet"],
-  ["follower", "#/follower"],
-  ["explorer", "#/explorer/alice-18e5.testnet"],
+  ["leaderboard", "#/leaderboard", "Attested performance"],
+  ["trader", "#/trader/alice-18e5.testnet", "Activity feed"],
+  ["checkout", "#/checkout/alice-18e5.testnet", "Buy key"],
+  ["follower", "#/follower", "Copy agent"],
+  ["explorer", "#/explorer/alice-18e5.testnet", "Public settlement"],
 ];
 const viewports = [
   ["1440x900", { width: 1440, height: 900 }],
@@ -24,15 +24,25 @@ const vite = spawn("npm", ["run", "dev", "-w", "apps/keys"], {
   stdio: "ignore",
   env: { ...process.env, VITE_LIVE: "1" },
 });
-await new Promise(r => setTimeout(r, 3500));
+await new Promise(r => setTimeout(r, 4500));
 try {
   await mkdir(out, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   for (const [vpName, vp] of viewports) {
     const page = await browser.newPage({ viewport: vp });
-  for (const [name, hash] of routes) {
-      await page.goto(`http://127.0.0.1:5174/${hash}`, { waitUntil: "networkidle", timeout: 20000 });
-      await page.waitForTimeout(1200);
+  for (const [name, hash, marker] of routes) {
+      await page.goto(`http://127.0.0.1:5174/${hash}`, { waitUntil: "load" });
+      await page.getByText(marker, { exact: false }).first().waitFor({ state: "visible", timeout: 25000 });
+      if (name === "follower") {
+        await page.waitForFunction(
+          () => /Decrypted feed/.test(document.body.innerText) && !/Awaiting sync/.test(document.body.innerText),
+          { timeout: 35000 },
+        ).catch(() => {});
+      }
+      if (name === "leaderboard") {
+        await page.waitForFunction(() => /kestrel|Attested performance/.test(document.body.innerText), { timeout: 15000 }).catch(() => {});
+      }
+      await page.waitForTimeout(400);
       const file = vpName === "1440x900" ? `${name}.png` : `${name}-${vpName}.png`;
       await page.screenshot({ path: path.join(out, file), fullPage: true });
     }
