@@ -55,8 +55,8 @@ export async function dryQuote(params: {
     depositType: "ORIGIN_CHAIN",
     destinationAsset: params.destinationAsset,
     amount: params.amount,
-    refundTo: "alice.near",
-    refundType: "DESTINATION_CHAIN",
+    refundTo: "0xb990bb466388488e43923e9ed878ff1615165af7",
+    refundType: "ORIGIN_CHAIN",
     recipient: params.recipient,
     recipientType: "DESTINATION_CHAIN",
     deadline,
@@ -67,11 +67,21 @@ export async function dryQuote(params: {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    try {
+      const err = (await res.json()) as { message?: string };
+      if (err.message) console.warn("1Click quote:", err.message);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
   const data = await res.json() as { quote?: Record<string, string>; quoteRequest?: { dry?: boolean } };
   const q = data.quote;
   if (!q) return null;
   const timeEstimate = Number(q.timeEstimate ?? q.time_estimate ?? 0);
+  const depositAddress = q.depositAddress ?? q.deposit_address;
+  const quoteDeadline = q.deadline ?? body.deadline;
   return {
     originAsset: params.originAsset,
     originChain: params.originAsset.includes("eth") ? "eth" : params.originAsset.includes("sol") ? "sol" : "near",
@@ -81,6 +91,8 @@ export async function dryQuote(params: {
     amountOut: q.amountOut ?? "",
     amountOutFormatted: q.amountOutFormatted ?? "",
     timeEstimateSec: Number.isFinite(timeEstimate) ? timeEstimate : undefined,
+    depositAddress: depositAddress ? String(depositAddress) : undefined,
+    deadline: quoteDeadline ? String(quoteDeadline) : undefined,
     dry: true,
     raw: data,
   };

@@ -1,6 +1,6 @@
 /** Chain Signatures metadata for the UI (read-only; MPC sign happens in agents/scripts). */
 const MPC = "v1.signer-prod.testnet";
-const RPC = import.meta.env.VITE_NEAR_RPC ?? "https://rpc.testnet.near.org";
+const RPC = import.meta.env.VITE_NEAR_RPC ?? "https://rpc.testnet.fastnear.com";
 
 export type ChainSigView = {
   nearAccount: string;

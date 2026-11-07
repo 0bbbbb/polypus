@@ -1,6 +1,9 @@
 import { REGISTRY_ID } from "../data/recorded.js";
 
-const RPC = import.meta.env.VITE_NEAR_RPC ?? "https://rpc.testnet.near.org";
+export const NEAR_RPC =
+  import.meta.env.VITE_NEAR_RPC ?? "https://rpc.testnet.fastnear.com";
+
+const RPC = NEAR_RPC;
 
 export async function viewCall<T>(method: string, args: Record<string, unknown>): Promise<T | null> {
   try {

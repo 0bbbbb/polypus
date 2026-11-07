@@ -3,6 +3,13 @@ import "@fontsource/inter-tight/500.css";
 import "@fontsource/inter-tight/600.css";
 import "./styles.css";
 import { truncate } from "./fx/formats.js";
+import {
+  displayAttestorRef,
+  displayEvmAddress,
+  displayNearAccount,
+  formatAgentNote,
+  isPlaceholderKey,
+} from "./fx/display.js";
 import { formatNearYocto, formatUnits } from "./fx/amounts.js";
 import { decoder } from "./fx/decode.js";
 import {
@@ -32,9 +39,11 @@ let liveFailed = false;
 let liveReady = false;
 let quotePreview: CheckoutQuote | null = null;
 let quoteError = "";
+let quoteLoading = false;
+let checkoutQuoteFor: string | null = null;
 
 function shell(page: string, body: string, foot: string) {
-  return `<div class="app"><nav class="nav">${navBrand()}<div class="nav__links">${nav(page)}</div></nav>
+  return `<div class="app"><nav class="nav"><div class="nav__row">${navBrand()}</div><div class="nav__links">${nav(page)}</div></nav>
   <main class="main">${body}</main>
   <footer class="footer">${foot}</footer></div>`;
 }
@@ -67,11 +76,15 @@ function nav(active: string) {
 }
 
 function attestationBar(t: Trader): string {
-  const m = t.pnl.attestation.measurement || t.pnl.attestation.signerPublicKey;
-  const kind = t.pnl.attestation.kind === "simulated" ? "simulated" : "live";
+  const label = displayAttestorRef(
+    t.pnl.attestation.signerPublicKey,
+    t.pnl.attestation.measurement,
+    t.pnl.attestation.kind,
+  );
+  const live = t.pnl.provenance.kind === "live" && !isPlaceholderKey(t.pnl.attestation.signerPublicKey);
   return `<div class="kc__att">
-    ${statusChip(kind === "live" ? "live" : "simulated", "Attested")}
-    <span class="kc__hash mono">${truncate(m)}</span>
+    ${statusChip(live ? "live" : "simulated", "Attested")}
+    <span class="kc__hash">${label}</span>
   </div>`;
 }
 
@@ -81,7 +94,7 @@ function traderCards(list: Trader[]) {
       const pnl = pnlPercent(t.pnl.pnlBps);
       return `<article class="kc">
         <header class="kc__head"><div class="kc__title"><span class="kc__rank">${i + 1}</span> ${t.handle}
-        <span class="kc__who mono">${truncate(t.account)}</span></div>
+        <span class="kc__acct">${displayNearAccount(t.account)}</span></div>
         <span class="kc__tag">${statusChipFromLive(t.pnl.provenance.kind === "live", "PnL")}</span></header>
         <div class="kc__lead kc__group"><div class="kc__big">${pnl}</div>
         <div class="kc__sub">${t.pnl.tradeCount} trades · through ${t.pnl.windowEnd.slice(0, 10)}</div>
@@ -100,8 +113,8 @@ function renderLeaderboard() {
     : liveMode
       ? ""
       : "";
-  const body = `<h1 class="h2">Attested performance. Trades stay sealed.</h1>
-  <p class="page-lead">Ranked by on-chain PnL statements. Activity and settlements stay encrypted until your agent decrypts inside a TEE.</p>
+  const body = `<div class="page-head"><h1 class="h2">Attested performance. Trades stay sealed.</h1>
+  <p class="page-lead">Ranked by on-chain PnL statements. Activity and settlements stay encrypted until your agent decrypts inside a TEE.</p></div>
   ${note}<div class="stack">${traderCards(traders)}</div>`;
   const foot = liveMode
     ? `${REGISTRY_ID} · testnet · ${statusChip("live", "Registry")}`
@@ -139,50 +152,76 @@ async function renderTrader(id: string) {
   document.querySelectorAll<HTMLElement>("[data-dec]").forEach(el => decoder(el).set(0));
 }
 
-function quoteBlock(q: CheckoutQuote | null, err: string): string {
+function quoteBlock(q: CheckoutQuote | null, err: string, loading: boolean, keyTrader?: string): string {
+  if (loading) {
+    return `<div class="kc__dl kc__group quote-skel" style="padding-bottom:8px" aria-busy="true">
+    <div></div><div></div><div></div><div></div></div>`;
+  }
   if (err) return `<p class="kc__note" style="box-shadow:none;color:var(--ink)">${err}</p>`;
   if (!q) return `<p class="page-lead" style="margin:0;padding:16px 20px">Dry quote from mainnet 1Click — no wallet spend.</p>`;
+  const dep = q.depositAddress ? truncate(q.depositAddress) : "— (dry)";
+  const exp = q.deadline ? q.deadline.slice(0, 19).replace("T", " ") + " UTC" : "—";
   return `<div class="kc__dl kc__group" style="padding-bottom:8px">
     <div><dt>Pay in</dt><dd>${q.amountInFormatted} <span class="mono">${truncate(q.originAsset)}</span></dd></div>
-    <div><dt>Receive</dt><dd>${q.amountOutFormatted} NEAR</dd></div>
+    <div><dt>Receive</dt><dd>${q.amountOutFormatted} USDC</dd></div>
+    <div><dt>Deposit</dt><dd class="mono">${dep}</dd></div>
+    <div><dt>Valid until</dt><dd>${exp}</dd></div>
     <div><dt>ETA</dt><dd>${q.timeEstimateSec ?? "—"}s · dry</dd></div>
-    <div><dt>Route</dt><dd>${statusChip("live", "1Click")}</dd></div>
+    <div><dt>Route</dt><dd>${statusChip("live", "1Click")} USDC Base → NEAR</dd></div>
+    ${keyTrader ? `<div><dt>Key trader</dt><dd>${displayNearAccount(keyTrader)}</dd></div>` : ""}
   </div>`;
 }
 
-function renderCheckout(id: string) {
+async function fetchCheckoutQuote(t: Trader): Promise<void> {
+  quoteLoading = true;
+  quoteError = "";
+  quotePreview = null;
+  const q = await dryQuote({
+    originAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+    destinationAsset: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+    amount: "2000000",
+    recipient: "alice.near",
+  });
+  quoteLoading = false;
+  if (!q) quoteError = "Quote failed — try again in a moment.";
+  else quotePreview = q;
+}
+
+async function renderCheckout(id: string) {
   const t = traders.find(x => x.account === decodeURIComponent(id)) ?? traders[0];
-  const body = `<article class="kc checkout-card">
+  if (checkoutQuoteFor !== t.account) {
+    checkoutQuoteFor = t.account;
+    quotePreview = null;
+    quoteError = "";
+    quoteLoading = true;
+    void fetchCheckoutQuote(t).then(() => renderCheckout(id));
+  }
+  const side = `<article class="checkout-side panel"><h2>${t.handle}</h2>
+  <p class="mono" style="font-size:13px;margin-bottom:8px">${displayNearAccount(t.account)}</p>
+  <p>Viewing key unlocks encrypted trade records for your copy agent inside a TEE — not your browser.</p>
+  <ol><li>Quote any origin asset via 1Click (dry, no spend).</li><li>Pay on NEAR testnet to the registry, or use mainnet Intents when funded.</li><li>Trader seals the epoch key to your agent X25519 pubkey.</li></ol></article>`;
+  const body = `<div class="checkout-layout"><article class="kc checkout-card">
   <header class="kc__head"><div class="kc__title">Buy key · ${t.handle}</div><span class="kc__tag">${statusChip("live", "1Click")}</span></header>
   <div class="kc__pay kc__group"><div class="kc__amt">${formatNearYocto(t.price.amount)}<small>/ ${t.price.periodDays}d</small></div>
   <span class="kc__chip">Registry</span></div>
   <div class="kc__route kc__group"><span class="kc__node is-on">Any chain</span><span class="kc__line"><i style="transform:scaleX(1)"></i></span>
   <span class="kc__node is-on">Intents</span><span class="kc__line"><i style="transform:scaleX(0.85)"></i></span><span class="kc__node is-on">NEAR</span></div>
-  ${quoteBlock(quotePreview, quoteError)}
+  ${quoteBlock(quotePreview, quoteError, quoteLoading, t.account)}
   <div style="padding:0 20px 16px;display:flex;gap:8px;flex-wrap:wrap">
   <button type="button" class="kc__btn" id="btn-quote">Refresh dry quote</button>
   <button type="button" class="kc__btn kc__btn--wide is-done" disabled>Pay testnet NEAR</button></div>
   <div class="kc__note"><span>Confidential Intents</span><span>${statusChip("simulated", "Partner JWT")}</span></div>
-  </article>`;
+  </article>${side}</div>`;
   app.innerHTML = shell("checkout", body, "Quotes use dry:true on the public 1Click API");
   document.getElementById("btn-quote")?.addEventListener("click", async () => {
-    quoteError = "";
-    quotePreview = null;
-    renderCheckout(id);
-    const q = await dryQuote({
-      originAsset: "nep141:wrap.near",
-      destinationAsset: "nep141:wrap.near",
-      amount: t.price.amount,
-      recipient: t.account,
-    });
-    if (!q) quoteError = "Quote failed — network or CORS.";
-    else quotePreview = q;
+    await fetchCheckoutQuote(t);
     renderCheckout(id);
   });
 }
 
-function dlRow(label: string, value: string, chip?: string): string {
-  return `<div><dt>${label}</dt><dd>${chip ?? ""}<span class="mono">${value}</span></dd></div>`;
+function dlRow(label: string, value: string, chip?: string, title?: string): string {
+  const t = title ? ` title="${title.replace(/"/g, "&quot;")}"` : "";
+  return `<div><dt>${label}</dt><dd>${chip ?? ""}<span class="mono"${t}>${value}</span></dd></div>`;
 }
 
 async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -229,11 +268,15 @@ async function renderFollower() {
     ${statusChip(gateway.ok ? "live" : "simulated", "Gateway")}</header>
     <div class="kc__dl kc__group">
     ${dlRow("Vendor", "NEAR AI Cloud", statusChip(gateway.ok ? "live" : "simulated"))}
-    ${dlRow("Gateway signer", gateway.signingAddress ? truncate(gateway.signingAddress) : "—")}
+    ${gateway.signingAddress ? dlRow("Gateway signer", displayEvmAddress(gateway.signingAddress), undefined, gateway.signingAddress) : dlRow("Gateway signer", "—")}
     ${dlRow("Quote digest", gateway.quoteDigest ? truncate(gateway.quoteDigest) : "—")}
     ${dlRow("Agent digest", truncate(attDigest))}
     ${dlRow("Guardrails hash", truncate(gHash))}
-    ${dlRow("PnL attestor", trader.pnl.attestation.signerPublicKey ? truncate(trader.pnl.attestation.signerPublicKey) : "—")}
+    ${
+      !isPlaceholderKey(trader.pnl.attestation.signerPublicKey)
+        ? dlRow("PnL attestor", truncate(trader.pnl.attestation.signerPublicKey))
+        : ""
+    }
     ${dlRow("Fetched", gateway.fetchedAt.slice(11, 19) + "Z")}
     </div>
     <p style="padding:12px 20px 16px;font-size:12px;color:var(--ink-2)">Key material never leaves the agent runtime. Human sees copied settlements only.</p>
@@ -252,13 +295,22 @@ async function renderFollower() {
     <ul class="kc__copied kc__group">${copiedRows}</ul>
     </article>`;
 
-  const explain = decisions[decisions.length - 1]?.explanation;
-  const explainPanel = explain
-    ? `<article class="panel" style="margin-top:0"><h2>Agent note</h2><p style="color:var(--ink);font-size:14px;margin:0">${explain}</p>
-    <p style="margin-top:12px;margin-bottom:0">${statusChip(snap ? "live" : "simulated", "Inference")}</p></article>`
+  const last = decisions[decisions.length - 1];
+  const explainPanel = last
+    ? (() => {
+        const { line, inferenceChip } = formatAgentNote({
+          action: last.action,
+          side: last.side,
+          symbol: last.symbol,
+          quoteHuman: last.quoteHuman,
+          inferenceSimulated: /SIMULATED|simulated inference/i.test(last.explanation ?? ""),
+        });
+        return `<article class="panel"><h2>Agent note</h2><p style="color:var(--ink);font-size:14px;margin:0">${line}</p>
+    <p style="margin-top:12px;margin-bottom:0">${statusChip(inferenceChip, inferenceChip === "live" ? "NEAR AI" : "Template inference")}</p></article>`;
+      })()
     : "";
 
-  const body = `<div class="grid2 grid2--balanced">${agentCard}${attRows}</div>${explainPanel}`;
+  const body = `<div class="follower-stack"><div class="grid2 grid2--balanced">${agentCard}${attRows}</div>${explainPanel}</div>`;
   app.innerHTML = shell("follower", body, "Epoch keys sealed to agent pubkey on subscribe");
   } catch (e) {
     app.innerHTML = shell("follower", `<p class="page-lead">Follower view error: ${String(e)}</p>`, "");
@@ -309,11 +361,14 @@ async function refreshLive() {
 async function render() {
   const { page, id } = route();
   if (page === "trader") await renderTrader(id ?? traders[0].account);
-  else if (page === "checkout") renderCheckout(id ?? traders[0].account);
+  else if (page === "checkout") await renderCheckout(id ?? traders[0].account);
   else if (page === "follower") await renderFollower();
   else if (page === "explorer") await renderExplorer(id ?? "");
   else renderLeaderboard();
 }
 
 window.addEventListener("hashchange", () => void render());
-refreshLive().finally(() => void render());
+void (async () => {
+  await refreshLive();
+  await render();
+})();

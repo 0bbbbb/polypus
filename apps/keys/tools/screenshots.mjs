@@ -21,7 +21,11 @@ const viewports = [
   ["390x844", { width: 390, height: 844 }],
 ];
 
-execSync("npm run build -w apps/keys", { cwd: root, stdio: "inherit" });
+execSync("npm run build -w apps/keys", {
+  cwd: root,
+  stdio: "inherit",
+  env: { ...process.env, VITE_LIVE: "1", VITE_NEAR_RPC: "https://rpc.testnet.fastnear.com" },
+});
 try {
   execSync(`fuser -k ${PORT}/tcp 2>/dev/null`, { stdio: "ignore" });
 } catch {
@@ -41,8 +45,15 @@ try {
     for (const [name, hash, marker] of routes) {
       await page.goto(`http://127.0.0.1:${PORT}/${hash}`, { waitUntil: "networkidle", timeout: 60000 });
       await page.getByText(marker, { exact: false }).first().waitFor({ state: "visible", timeout: 30000 });
+      if (name === "leaderboard") {
+        await page.waitForFunction(() => !/Registry unreachable/.test(document.body.innerText), { timeout: 45000 });
+        await page.waitForFunction(() => /alice-18e5\.testnet/.test(document.body.innerText), { timeout: 15000 });
+      }
       if (name === "follower") {
         await page.locator(".kc__copied li").first().waitFor({ state: "visible", timeout: 30000 });
+      }
+      if (name === "checkout") {
+        await page.waitForFunction(() => /Pay in/.test(document.body.innerText), { timeout: 45000 });
       }
       await page.waitForTimeout(500);
       const file = vpName === "1440x900" ? `${name}.png` : `${name}-${vpName}.png`;

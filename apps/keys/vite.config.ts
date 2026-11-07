@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import path from "node:path";
 
 export default defineConfig({
+  envDir: __dirname,
   base: "./",
   resolve: {
     alias: {
