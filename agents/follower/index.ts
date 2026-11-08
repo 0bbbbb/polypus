@@ -46,6 +46,7 @@ type Copy = {
   at: number;
   guardrailsHash: string;
   inference?: InferenceProof;
+  attempts?: number;
   solanaSig?: string;
   mpcTx?: string;
   error?: string;
@@ -229,6 +230,10 @@ async function activate(a: AgentRec): Promise<Live | null> {
 
 async function copyNew(a: AgentRec, handle: string) {
   const active = a.onChainGuardrailsHash ? a.guardrails[a.onChainGuardrailsHash] : undefined;
+  for (const c of a.copies.filter(c => c.status === "failed" && (c.attempts ?? 1) < 3)) {
+    c.attempts = (c.attempts ?? 1) + 1;
+    await execute(a, c, handle);
+  }
   const done = new Set(a.copies.map(c => c.seq));
   const start = a.activatedAt ?? Date.now();
   const sorted = [...a.decrypted].sort((x, y) => x.seq - y.seq);
@@ -285,6 +290,7 @@ async function copyNew(a: AgentRec, handle: string) {
 async function execute(a: AgentRec, c: Copy, handle: string) {
   try {
     c.status = "signing";
+    c.error = undefined;
     save();
     const p = mpcPath(a.follower);
     const pk = await derivedSolanaAddress(AGENT_OPERATOR, p);

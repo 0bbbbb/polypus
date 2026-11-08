@@ -20,8 +20,8 @@ export type TradeRecord = {
 };
 
 export const STYLES: Record<string, { tokens: Sym[]; minUsd: number; maxUsd: number; style: string }> = {
-  kestrel: { tokens: ["SOL", "JUP"], minUsd: 80, maxUsd: 240, style: "SOL and JUP swing trades, small size, hours-long holds" },
-  heron: { tokens: ["SOL", "BONK", "JUP"], minUsd: 40, maxUsd: 160, style: "Solana momentum, quick rotations into BONK and JUP" },
+  kestrel: { tokens: ["SOL", "JUP"], minUsd: 80, maxUsd: 240, style: "Rotates between SOL and JUP in small size" },
+  heron: { tokens: ["SOL", "BONK", "JUP"], minUsd: 40, maxUsd: 160, style: "Solana momentum with quick rotations into BONK and JUP" },
 };
 
 export function toUnits(amount: number, decimals: number): string {

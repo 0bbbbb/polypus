@@ -1,5 +1,5 @@
 import { connect, KeyPair, keyStores, Account, providers } from "near-api-js";
-import { REGISTRY, NEAR_RPCS, CRED_DIR, nearTxUrl } from "./config.js";
+import { REGISTRY, NEAR_RPCS, NEAR_TX_RPC, CRED_DIR, nearTxUrl } from "./config.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -15,8 +15,9 @@ export function hasCredential(named: string): boolean {
   return fs.existsSync(path.join(CRED_DIR, `${named}.json`));
 }
 
-export async function accountFor(named: string): Promise<Account> {
-  let p = accounts.get(named);
+export async function accountFor(named: string, nodeUrl = NEAR_TX_RPC): Promise<Account> {
+  const cacheKey = `${named}|${nodeUrl}`;
+  let p = accounts.get(cacheKey);
   if (!p) {
     p = (async () => {
       const credPath = path.join(CRED_DIR, `${named}.json`);
@@ -26,8 +27,7 @@ export async function accountFor(named: string): Promise<Account> {
       await keyStore.setKey("testnet", named, KeyPair.fromString(cred.private_key as `ed25519:${string}`));
       const config = {
         networkId: "testnet",
-        nodeUrl: NEAR_RPCS[0],
-        provider: { type: "FailoverRpcProvider", args: NEAR_RPCS.map(url => ({ url })) },
+        nodeUrl,
         keyStore,
         headers: {},
         logger: false,
@@ -35,7 +35,7 @@ export async function accountFor(named: string): Promise<Account> {
       const near = await connect(config as Parameters<typeof connect>[0]);
       return near.account(named);
     })();
-    accounts.set(named, p);
+    accounts.set(cacheKey, p);
   }
   return p;
 }
@@ -73,10 +73,10 @@ export async function call<T = unknown>(
   contractId: string,
   methodName: string,
   args: Record<string, unknown>,
-  opts: { gas?: number; deposit?: bigint } = {},
+  opts: { gas?: number; deposit?: bigint; rpc?: string } = {},
 ): Promise<CallResult<T>> {
   return withLock(signer, async () => {
-    const acc = await accountFor(signer);
+    const acc = await accountFor(signer, opts.rpc);
     let lastErr: unknown;
     for (let attempt = 0; attempt < 4; attempt++) {
       try {

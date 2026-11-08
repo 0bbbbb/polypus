@@ -187,7 +187,7 @@ async function runTrader(account: string) {
       log.error(`${st.handle}: ${st.error}`);
       if (/invalid epoch|no key/i.test(st.error)) ({ epoch, key } = await ensureEpoch(account));
     }
-    await sleep(3000);
+    await sleep(5000);
   }
 }
 

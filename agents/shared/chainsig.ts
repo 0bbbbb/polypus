@@ -8,7 +8,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { call, viewOn } from "./near.js";
-import { DEVNET_KEYPAIR, MPC_CONTRACT, SOLANA_RPC, nearTxUrl, solTxUrl } from "./config.js";
+import { DEVNET_KEYPAIR, MPC_CONTRACT, NEAR_RPC, SOLANA_RPC, nearTxUrl, solTxUrl } from "./config.js";
 
 export const MEMO_PROGRAM = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 export const conn = new Connection(SOLANA_RPC, "confirmed");
@@ -65,7 +65,7 @@ export async function mpcSendMemo(operator: string, path: string, memo: string):
         MPC_CONTRACT,
         "sign",
         { request: { path, payload_v2: { Eddsa: Buffer.from(msg).toString("hex") }, domain_id: 1 } },
-        { gas: 300, deposit: 1n },
+        { gas: 300, deposit: 1n, rpc: NEAR_RPC },
       );
       tx.addSignature(from, Buffer.from(Uint8Array.from(signed.value.signature)));
       if (!tx.verifySignatures()) throw new Error("MPC signature did not verify for derived key");

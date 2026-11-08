@@ -10,6 +10,7 @@ export const REGISTRY = process.env.POLYPUS_REGISTRY ?? "polypus-keys-18e5.testn
 export const REGISTRY_DEPLOY_TX = process.env.POLYPUS_REGISTRY_DEPLOY_TX ?? "12URKRtc3qZ7KQB1vMiYTrvJVbvrrvpjLUuLZ79yXeof";
 export const NEAR_RPCS = (process.env.NEAR_RPC ?? "https://rpc.testnet.fastnear.com,https://near-testnet.drpc.org,https://rpc.testnet.near.org").split(",");
 export const NEAR_RPC = NEAR_RPCS[0]!;
+export const NEAR_TX_RPC = process.env.NEAR_TX_RPC ?? "https://near-testnet.drpc.org";
 export const SOLANA_RPC = process.env.POLYPUS_RPC ?? "https://api.devnet.solana.com";
 export const SOLANA_PROGRAM = "PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj";
 export const MPC_CONTRACT = "v1.signer-prod.testnet";
