@@ -4,16 +4,22 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "VITE_LIVE=1 vite --port 5174 --host 127.0.0.1",
-    "build": "VITE_LIVE=1 tsc --noEmit && vite build",
-    "preview": "vite preview --port 4174",
-    "screenshots": "node tools/screenshots.mjs",
-    "test:e2e": "playwright test"
+    "dev": "vite --port 5174 --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4174 --host 127.0.0.1",
+    "mock:api": "node tools/mock-api.mjs",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5.3.0",
+    "@near-wallet-selector/core": "^10.1.4",
+    "@near-wallet-selector/here-wallet": "^10.1.4",
+    "@near-wallet-selector/intear-wallet": "^10.1.4",
+    "@near-wallet-selector/meteor-wallet": "^10.1.4",
+    "@near-wallet-selector/my-near-wallet": "^10.1.4",
     "@polypus/sdk": "*",
-    "@scure/base": "^1.2.4"
+    "@scure/base": "^1.2.4",
+    "preact": "^11.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
