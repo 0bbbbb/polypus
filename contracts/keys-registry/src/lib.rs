@@ -311,6 +311,20 @@ impl KeysRegistry {
         );
     }
 
+    pub fn update_guardrails(&mut self, trader: AccountId, guardrails_hash: String) {
+        let follower = env::predecessor_account_id();
+        require!(guardrails_hash.len() <= MAX_RECEIPT, "guardrails_hash too long");
+        let key = (follower.clone(), trader.clone());
+        let mut sub = self.subscriptions.get(&key).expect("no subscription");
+        require!(sub.status == SubStatus::Active, "subscription not active");
+        sub.guardrails_hash = guardrails_hash.clone();
+        self.subscriptions.insert(&key, &sub);
+        emit_event(
+            "guardrails",
+            serde_json::json!([{"follower": follower, "trader": trader, "guardrails_hash": guardrails_hash}]),
+        );
+    }
+
     pub fn rotate_epoch(
         &mut self,
         epoch: u32,
@@ -357,13 +371,22 @@ impl KeysRegistry {
             ciphertext,
             posted_at: env::block_timestamp(),
         };
-        let mut vec = self.feed.get(&trader).unwrap_or_else(|| Vector::new(StorageKey::Feed));
+        let mut vec = self.feed.get(&trader).unwrap_or_else(|| Vector::new(feed_prefix(&trader)));
         vec.push(&entry);
         self.feed.insert(&trader, &vec);
         emit_event(
             "feed",
             serde_json::json!([{"trader": trader, "seq": seq, "epoch": epoch}]),
         );
+    }
+
+    /// Early deployments gave every trader's feed vector the same storage prefix, so entries collided.
+    /// Moves the caller's feed to its own prefix; sequence numbers keep counting up.
+    pub fn reset_feed(&mut self) {
+        let trader = env::predecessor_account_id();
+        require!(self.traders.contains_key(&trader), "not a trader");
+        self.feed.insert(&trader, &Vector::new(feed_prefix(&trader)));
+        emit_event("feed_reset", serde_json::json!([{"trader": trader}]));
     }
 
     pub fn publish_pnl(
@@ -406,6 +429,30 @@ impl KeysRegistry {
         self.subscriptions
             .get(&(follower, trader))
             .map(subscription_view)
+    }
+
+    pub fn get_followers(&self, trader: AccountId) -> Vec<SubscriptionView> {
+        self.followers_by_trader
+            .get(&trader)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|f| self.subscriptions.get(&(f, trader.clone())))
+            .map(subscription_view)
+            .collect()
+    }
+
+    pub fn get_subscriptions_of(&self, follower: AccountId) -> Vec<SubscriptionView> {
+        self.traders_by_follower
+            .get(&follower)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|t| self.subscriptions.get(&(follower.clone(), t)))
+            .map(subscription_view)
+            .collect()
+    }
+
+    pub fn get_feed_len(&self, trader: AccountId) -> u64 {
+        self.feed_seq.get(&trader).unwrap_or(0)
     }
 
     pub fn get_sealed_key(
@@ -584,6 +631,12 @@ fn verify_ed25519_statement(attestor_pubkey_b58: &str, statement: &str, signatur
     require!(ok, "ed25519 signature mismatch");
 }
 
+fn feed_prefix(trader: &AccountId) -> Vec<u8> {
+    let mut p = b"fv".to_vec();
+    p.extend_from_slice(&env::sha256_array(trader.as_bytes()));
+    p
+}
+
 fn push_unique(
     map: &mut LookupMap<AccountId, Vec<AccountId>>,
     primary: &AccountId,
@@ -658,7 +711,35 @@ mod tests {
             "att".into(),
             "gh".into(),
         );
-        let sub = contract.get_subscription(carol, alice).unwrap();
+        let sub = contract.get_subscription(carol.clone(), alice.clone()).unwrap();
         assert_eq!(sub.status, "active");
+        assert_eq!(contract.get_followers(alice.clone()).len(), 1);
+        assert_eq!(contract.get_subscriptions_of(carol.clone()).len(), 1);
+        testing_env!(ctx(carol.clone()).build());
+        contract.update_guardrails(alice.clone(), "sha256-new".into());
+        assert_eq!(contract.get_subscription(carol.clone(), alice.clone()).unwrap().guardrails_hash, "sha256-new");
+    }
+
+    #[test]
+    fn feeds_do_not_collide() {
+        let owner = accounts(0);
+        let mut contract = KeysRegistry::new(owner);
+        for t in [accounts(1), accounts(2)] {
+            testing_env!(ctx(t.clone()).build());
+            contract.register_trader(
+                t.to_string(),
+                format!("poly1q{}", "q".repeat(POLY1Q_LEN - 6)),
+                bs58::encode([1u8; 32]).into_string(),
+                "solana-1".into(),
+                U128(1),
+                30,
+                bs58::encode([2u8; 32]).into_string(),
+                "abc".into(),
+                None,
+            );
+            contract.post_feed(1, format!("ct-{}", t));
+        }
+        assert_eq!(contract.get_feed(accounts(1), 0, 10)[0].ciphertext, format!("ct-{}", accounts(1)));
+        assert_eq!(contract.get_feed(accounts(2), 0, 10)[0].ciphertext, format!("ct-{}", accounts(2)));
     }
 }
