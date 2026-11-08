@@ -5,8 +5,13 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": "."
+    "noEmit": true
   },
-  "include": ["./**/*.ts"]
+  "include": [
+    "./**/*.ts",
+    "../apps/keys/src/api/types.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

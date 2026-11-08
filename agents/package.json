@@ -4,9 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "attestor": "tsx attestor/index.ts",
+    "api": "tsx api/server.ts",
     "trader": "tsx trader-node/index.ts",
     "follower": "tsx follower/index.ts",
+    "attestor": "tsx attestor/index.ts",
+    "attestor:once": "tsx attestor/index.ts --once",
+    "setup:live": "tsx scripts/setup-live.ts",
+    "setup:agent": "tsx scripts/create-agent-account.ts",
+    "typecheck": "tsc --noEmit -p .",
     "test": "tsx --test test/guardrails.test.ts"
   },
   "dependencies": {
@@ -14,7 +19,8 @@
     "@noble/hashes": "^1.8.0",
     "@polypus/sdk": "*",
     "@scure/base": "^1.2.4",
-    "near-api-js": "^5.1.1"
+    "near-api-js": "^5.1.1",
+    "@solana/web3.js": "^1.98.4"
   },
   "devDependencies": {
     "tsx": "^4.20.5"

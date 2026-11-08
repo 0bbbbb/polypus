@@ -26,3 +26,6 @@ dist/
 apps/keys/test-results/
 apps/keys/playwright-report/
 .near-credentials/
+
+# Local agent runtime state (no secrets; secrets live in ~/.polypus-keys)
+.polypus-run/

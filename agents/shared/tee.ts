@@ -1,4 +1,3 @@
-/** Agent / attestor TEE labels: live NEAR AI gateway binding or explicit simulated fallback. */
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { attestationQuoteDigest, fetchAttestationReport, randomNonceHex, attestationNonceOk } from "./nearai.js";

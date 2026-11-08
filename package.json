@@ -15,7 +15,11 @@
     "build": "npm run build -w apps/keys",
     "test": "npm test --workspaces --if-present",
     "demo": "bash scripts/demo.sh",
-    "demo:live": "bash scripts/demo-live.sh"
+    "demo:live": "bash scripts/demo-live.sh",
+    "dev:all": "node scripts/dev-all.mjs",
+    "services": "node scripts/dev-all.mjs --no-app",
+    "setup:live": "npm run setup:live -w agents",
+    "setup:agent": "npm run setup:agent -w agents"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4"
