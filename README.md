@@ -1,66 +1,70 @@
-# Polypus Keys · private copy-trading (NEAR HACKATHON)
+# Polypus Keys
 
-**One line:** traders keep trades shielded, publish **one attested PnL**, and sell viewing keys that only a **follower agent in a TEE** can use—never the human. Followers pay via **NEAR Intents**; settlements use **Polypus** on Solana; **Chain Signatures** link NEAR accounts to Solana signers.
+Private copy-trading on NEAR. Traders post their trades encrypted on-chain and sell keys. A buyer never sees the trades; their copy agent does. The trader's node seals the epoch key to the agent's X25519 key, the agent decrypts the feed, applies the buyer's guardrails (committed on-chain as a hash), and copies on Solana through NEAR Chain Signatures. Trader returns are computed from the same encrypted feed by an attestor and published with a signature the registry verifies.
 
-> **UNAUDITED research code — testnet/devnet only.** See [LICENSE](LICENSE). Never use real funds in Polypus contracts.
+> Unaudited hackathon code. NEAR testnet and Solana devnet only.
 
-## Try Polypus Keys in 5 minutes
+## Run it
 
 ```bash
-cd polypus
-source scripts/env.sh          # optional pinned toolchain
 npm install
-npm run demo                   # protocol tests + app build + NEAR keys e2e
-npm run demo:live              # agents loop + Solana explorer links (testnet/devnet)
-VITE_LIVE=1 npm run app         # http://127.0.0.1:5174
+npm run setup:agent   # once: creates the agent operator account (polypus-agent-18e5.testnet)
+npm run setup:live    # once: attestor registration + trader history at real historical prices
+npm run dev:all       # api + trader node + follower agent + attestor + app
 ```
 
-| Do | See |
-|---|---|
-| `node scripts/keys-e2e.mjs` | **Live testnet:** subscribe → seal epoch key → encrypted feed → decrypt → **publish_pnl** (checkpoints printed) |
-| Open `#/leaderboard` with `VITE_LIVE=1` | Traders from **`polypus-keys-18e5.testnet`** with on-chain PnL statements |
-| Checkout → **Refresh dry quote** | Real **1Click** mainnet quote (`dry: true`) |
-| `bash scripts/devnet-deploy.sh` | **Solana devnet** program deploy + Groth16 pool e2e → `deployments/devnet.json` + Explorer links in app |
-| `node scripts/keys-e2e.mjs` | NEAR feed flow + **live devnet** trader/follower deposits when `~/.polypus-keys/devnet-ledger.json` exists |
+Open http://127.0.0.1:5174, pick a trader, and either connect a testnet wallet (MyNearWallet, Meteor, Intear, HERE) or use **Try with a demo account**. The timeline on the trader page links every transaction as it lands:
 
-Judge quickstart: [docs/hackathon/README_KEYS.md](docs/hackathon/README_KEYS.md) · Scope: [docs/hackathon/SCOPE.md](docs/hackathon/SCOPE.md) · Submission draft: [docs/hackathon/SUBMISSION.md](docs/hackathon/SUBMISSION.md)
+1. `subscribe` on `polypus-keys-18e5.testnet`, paying the key price
+2. `rotate_epoch`: the trader node seals the epoch key to your agent
+3. `post_feed`: the encrypted trades your agent decrypted
+4. MPC `sign` on `v1.signer-prod.testnet` plus the resulting Solana devnet transaction
 
-## NEAR technology (real vs mocked)
+`npm run demo:live` runs the same purchase headless and checks every transaction on NEAR RPC and Solana devnet (finalized). With the services running, `node scripts/verify-txs.mjs [follower] [trader]` checks the transactions in the app's timeline the same way.
 
-| Tech | Status | Where |
+Views: Discover (traders with attested equity curves), Trader (equity, encrypted or decrypted trade history, buy panel with a live Intents quote), Portfolio (guardrails editor, copied trades, agent attestation) and Proof (contract, statements, transactions). A key you already hold shows a Renew action, so the demo account can be bought repeatedly.
+
+`npm run screenshots -w apps/keys` rebuilds the app and drives it with playwright-core against the running services (includes a real demo purchase); images land in `apps/keys/screenshots`.
+
+Secrets stay out of the repo: NEAR keys are read from `~/.near-credentials/testnet`, agent and epoch keys live in `~/.polypus-keys`, and `.env` (optional `NEARAI_API_KEY`, `ONECLICK_PARTNER_JWT`) is loaded only by the Node services. The browser talks to the local API and never receives a key.
+
+## What is live
+
+| Piece | State | Code |
 |---|---|---|
-| **keys-registry** (testnet) | **Real** | [contracts/keys-registry/](contracts/keys-registry/) · `polypus-keys-18e5.testnet` |
-| **Chain Signatures** → Solana ed25519 | **Real** — MPC-signed **devnet** transfer (`deployments/devnet.json` → `chain_signatures`) | [scripts/chainsig-devnet.mjs](scripts/chainsig-devnet.mjs) |
-| **1Click / Intents** dry quotes | **Real** (mainnet API) | [apps/keys/src/near/oneclick.ts](apps/keys/src/near/oneclick.ts) |
-| Encrypted feed + epoch keys | **Real** on registry | [sdk/src/feedcrypto.ts](sdk/src/feedcrypto.ts), [agents/](agents/) |
-| PnL attestor + follower agent TEE | **SIMULATED** scan/key-hold; **live** NEAR AI gateway attestation (keyless) | [agents/attestor/](agents/attestor/), [agents/follower/](agents/follower/), [agents/shared/nearai.ts](agents/shared/nearai.ts) — `NEARAI_API_KEY` for live inference text |
-| Confidential Intents checkout | **Not wired** (Partner JWT) | UI label |
-| Polypus pool on Solana devnet | **Real** — program `PoLYdUX…`, Groth16 deposits/transfers/withdraws + Keys agent deposits | [deployments/devnet.json](deployments/devnet.json) |
+| Registry contract | Live on testnet | [contracts/keys-registry](contracts/keys-registry) |
+| Wallet purchase | Live: NEAR Wallet Selector, `subscribe` with the real deposit | [apps/keys](apps/keys) |
+| Demo purchase | Live: API signs as `carol-18e5.testnet`, rate limited | [agents/api](agents/api) |
+| Encrypted feed | Live: XChaCha20-Poly1305, epoch keys sealed with X25519 | [sdk/src/feedcrypto.ts](sdk/src/feedcrypto.ts), [agents/trader-node](agents/trader-node) |
+| Trades | Paper trades at live Jupiter/CoinGecko prices, posted every 60-90 s; history backfilled at real historical prices | [agents/shared/book.ts](agents/shared/book.ts) |
+| Attested PnL | Live: attestor decrypts the on-chain feed, marks to market, `publish_pnl` verifies ed25519 on-chain | [agents/attestor](agents/attestor) |
+| Guardrails | Live: max per trade, copy size, token allowlist enforced by the agent; hash on-chain via `update_guardrails` | [agents/follower](agents/follower) |
+| Copy execution | Live: Chain Signatures signs a Solana devnet transaction from an MPC-derived address per follower; the memo carries a commitment, not the trade | [agents/shared/chainsig.ts](agents/shared/chainsig.ts) |
+| NEAR AI Cloud | Live when `NEARAI_API_KEY` is set: each copy decision is explained by a model on NEAR AI Cloud and the gateway's signature over request and response hashes is verified locally | [agents/shared/nearai.ts](agents/shared/nearai.ts) |
+| NEAR Intents | Live when `ONECLICK_PARTNER_JWT` is set: confidential dry quotes for paying the key from other chains (mainnet quote only, no funds move) | [agents/shared/oneclick.ts](agents/shared/oneclick.ts) |
+| Agent and attestor TEE | Simulated: local processes bound to a fresh NEAR AI gateway attestation, not running inside an enclave | [agents/shared/tee.ts](agents/shared/tee.ts) |
+| Swap venue | Simulated: devnet has no JUP/BONK liquidity, so copies are signed receipts, not swaps | |
 
-## Polypus protocol (Solana privacy)
+## Layout
 
-Private SPL transfers and private programs on Solana. Design: [`../docs/POLYPUS_DESIGN.md`](../docs/POLYPUS_DESIGN.md).
+```
+contracts/keys-registry   NEAR registry (Rust, near-sdk 5)
+agents/api                local HTTP + SSE API the app talks to (127.0.0.1:8787)
+agents/trader-node        seals epoch keys to subscribers, posts encrypted trades
+agents/follower           per-subscription copy agent
+agents/attestor           PnL from the decrypted feed, publish_pnl
+apps/keys                 the app (Preact + Vite)
+sdk                       feed crypto shared by agents and app
+programs, circuits, crates  Polypus shielded pool on Solana (pre-hackathon work)
+```
 
-### Status (Milestone 1 + M2 + Keys NEAR integration)
-
-| Area | State |
-|---|---|
-| `spec/SPEC.md`, `crates/polypus-crypto`, Noir kernel | Reference impl + vectors |
-| `programs/polypus-pool` | Anchor pool, real Groth16 proofs, ~220k CU (localnet e2e) |
-| `apps/keys/` | Hackathon product UI |
-| `agents/` | Trader node, attestor, follower (local SIMULATED TEE) |
-
-### Build and test (protocol)
+## Tests
 
 ```bash
-source scripts/env.sh
-bash scripts/test-all.sh
-scripts/localnet-e2e.sh          # real proofs on local validator
+npm test -w agents
+(cd contracts/keys-registry && cargo test --lib)
+npm run build
+bash scripts/test-all.sh   # Polypus protocol suite
 ```
 
-Full layout and toolchain pins remain in git history below this section.
-
-## Security
-
-- Unaudited. Dev/test keys only. Do not deploy Polypus to mainnet with real funds.
-- Hackathon NEAR integration is judged separately from pre-Oct-19 Solana protocol work ([HACKATHON-RULES.md](docs/hackathon/HACKATHON-RULES.md)).
+The Polypus protocol (shielded SPL transfers on Solana, Groth16 pool `PoLYdUXuf78YC6aqE4qkmyFkfJi3mm773ZqJNECDYtj` on devnet) predates the hackathon; see [docs/hackathon/HACKATHON-RULES.md](docs/hackathon/HACKATHON-RULES.md).

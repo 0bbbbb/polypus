@@ -28,7 +28,7 @@ export function Discover() {
         </dl>
       </section>
 
-      <Card title="Traders" meta={<span class="muted">Attested 30-day return · updates live</span>} class="board" flush>
+      <Card title="Traders" meta={<span class="muted">Attested return on paper trades at live prices</span>} class="board" flush>
         <div class="tt" aria-label="Traders">
           <div class="tt__head">
             <span>Trader</span>

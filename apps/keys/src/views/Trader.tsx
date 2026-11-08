@@ -77,6 +77,7 @@ function TraderHeader({ t }: { t: TraderSummary }) {
         <p class="th__meta">
           <AddrLink addr={t.account} chain="near" />
           {t.style && <Tag>{t.style}</Tag>}
+          <Tag>Paper trades</Tag>
         </p>
       </div>
       <div class="th__live">
