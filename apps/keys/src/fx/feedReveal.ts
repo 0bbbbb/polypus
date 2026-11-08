@@ -1,30 +1,34 @@
 import { decoder } from "./decode.js";
 
-/** When unlocked, streak-decrypt feed cells (scroll-friendly decode animation). */
-export function revealFeed(container: HTMLElement, unlocked: boolean): void {
-  const els = [...container.querySelectorAll<HTMLElement>("[data-dec]")];
-  const decs = els.map(el => decoder(el));
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+/** Seal every [data-dec] cell under `container`; returns a function that wipes them open. */
+export function sealCells(container: HTMLElement): () => Promise<void> {
+  const decs = [...container.querySelectorAll<HTMLElement>("[data-dec]")].map(el => decoder(el));
   decs.forEach(d => d.set(0));
-  if (!unlocked) return;
+  return () => decryptAll(decs);
+}
 
-  let tick = 0;
-  const loop = () => {
-    let active = false;
-    for (const d of decs) {
-      if (d.tick()) active = true;
-    }
-    if (active) requestAnimationFrame(loop);
-  };
-
-  const run = (stagger: number) => {
-    decs.forEach((d, i) => {
-      window.setTimeout(() => {
-        d.set(1);
-        if (i === 0) requestAnimationFrame(loop);
-      }, stagger * i);
-    });
-  };
-
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  run(reduce.matches ? 0 : 100);
+function decryptAll(decs: ReturnType<typeof decoder>[], duration = 650, stagger = 140): Promise<void> {
+  if (reduce.matches || !decs.length) {
+    decs.forEach(d => d.set(1));
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    const start = performance.now();
+    const loop = (now: number) => {
+      let done = true;
+      decs.forEach((d, i) => {
+        const r = (now - start - i * stagger) / duration;
+        d.set(r);
+        if (r < 1) {
+          done = false;
+          d.tick();
+        }
+      });
+      if (done) resolve();
+      else requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
 }

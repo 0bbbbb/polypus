@@ -4,8 +4,8 @@ import "@fontsource/inter-tight/600.css";
 import "./styles.css";
 import { truncate } from "./fx/formats.js";
 import { displayAttestorRef, displayEvmAddress, displayNearAccount, isPlaceholderKey } from "./fx/display.js";
-import { formatNearYocto, formatUnits } from "./fx/amounts.js";
-import { revealFeed } from "./fx/feedReveal.js";
+import { formatNearYocto, formatUnits, formatUsdPrice, formatUtcTime, groupThousands } from "./fx/amounts.js";
+import { sealCells } from "./fx/feedReveal.js";
 import {
   RECORDED_SETTLEMENTS,
   RECORDED_TRADERS,
@@ -14,18 +14,27 @@ import {
   pnlPercent,
 } from "./data/recorded.js";
 import { loadLiveTraders } from "./data/live.js";
-import type { CheckoutQuote, Trader } from "./data/types.js";
+import type { CheckoutQuote, Trader, TradeRecord } from "./data/types.js";
 import { dryQuote } from "./near/oneclick.js";
 import { PAY_OPTIONS, QUOTE_DESTINATION, type PayOption } from "./data/payOptions.js";
 import { loadDevnetSettlements } from "./data/devnet.js";
 import { fetchFeedLive } from "./near/registry.js";
 import { chainSigForTrader } from "./near/chainsig.js";
 import { fetchGatewaySlice } from "./near/nearaiBrowser.js";
-import { fetchSubscriptionLive, loadFollowerSnapshot } from "./data/followerLive.js";
+import { fetchSubscriptionLive, loadFollowerSnapshot, type FollowerSnapshot } from "./data/followerLive.js";
 import { LIVE_FOLLOWER, LIVE_TRADER } from "./data/constants.js";
 import { statusChip } from "./ui/chips.js";
 import { DEFAULT_GUARDRAILS } from "./data/guardrails.js";
-import { getPayOptionId, isDemoUnlocked, isKeyBought, setDemoUnlocked, setKeyBought, setPayOptionId } from "./app/session.js";
+import {
+  advance,
+  anyUnlocked,
+  demoRequested,
+  getPayOptionId,
+  isUnlocked,
+  setPayOptionId,
+  stageOf,
+  type Stage,
+} from "./app/session.js";
 
 const app = document.getElementById("app")!;
 const wantLive = import.meta.env.VITE_LIVE !== "0";
@@ -39,15 +48,25 @@ let quoteLoading = false;
 let quoteFor: string | null = null;
 let payOption: PayOption = PAY_OPTIONS[0]!;
 
-function shell(mainNav: string, body: string, foot: string) {
+/** Bumped on every route render so stale async work never paints over a newer page. */
+let renderSeq = 0;
+
+const CHECK = `<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 6.3l2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CHEVRON = `<svg class="proof__chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function footText(): string {
+  return liveMode ? `${REGISTRY_ID} · NEAR testnet` : "Polypus Keys · NEAR testnet demo";
+}
+
+function shell(mainNav: string, body: string) {
   return `<div class="app"><nav class="nav nav--story"><div class="nav__row">${navBrand()}${nav(mainNav)}</div></nav>
   <main class="main">${body}</main>
-  <footer class="footer footer--story"><span>${foot}</span>
+  <footer class="footer footer--story"><span>${footText()}</span>
   <a href="#/proof" class="footer__link">Proof &amp; explorer</a></footer></div>`;
 }
 
 function route(): { page: string; id?: string } {
-  const raw = location.hash.replace(/^#\/?/, "") || "traders";
+  const raw = location.hash.replace(/^#\/?/, "").split("?")[0] || "traders";
   const [page, id] = raw.split("/");
   const alias: Record<string, string> = {
     "": "traders",
@@ -56,7 +75,7 @@ function route(): { page: string; id?: string } {
     follower: "agent",
     explorer: "proof",
   };
-  return { page: alias[page] ?? page, id };
+  return { page: alias[page!] ?? page!, id };
 }
 
 function navBrand() {
@@ -84,57 +103,85 @@ function listedTraders(): Trader[] {
 
 function redactPills(n = 6): string {
   const widths = ["w-72", "w-56", "w-64", "w-48", "w-60", "w-52"];
-  return `<div class="redact-pills">${widths
+  return `<div class="redact-pills" aria-label="Hidden trades">${widths
     .slice(0, n)
     .map(w => `<span class="redact-pill ${w}"></span>`)
     .join("")}</div>`;
 }
 
+/* ---------- home ---------- */
+
 function homeTraderCard(t: Trader, rank: number): string {
   const pnl = pnlPercent(t.pnl.pnlBps);
   const verified = t.pnl.provenance.kind === "live" || t.pnl.tradeCount > 0;
+  const n = t.pnl.tradeCount;
   return `<article class="kc home-card">
     <header class="kc__head"><div class="kc__title"><span class="kc__rank">${rank}</span> ${t.handle}
     <span class="kc__acct">${displayNearAccount(t.account)}</span></div>
-    ${verified ? `<span class="verify-chip">✓ Verified</span>` : ""}</header>
+    ${verified ? `<span class="verify-chip">${CHECK} Verified</span>` : ""}</header>
     <div class="home-card__body">
-      <div class="home-card__pnl">${pnl}</div>
-      <p class="home-card__meta">${t.pnl.tradeCount} shielded trades · verified on-chain</p>
-      ${redactPills()}
+      <div class="home-card__stat"><div class="home-card__pnl">${pnl}</div>
+      <p class="home-card__meta">Verified return · ${groupThousands(n)} private trade${n === 1 ? "" : "s"}</p></div>
+      <div class="home-card__hidden"><span class="home-card__hlabel">Trades hidden until you buy the key</span>${redactPills()}</div>
     </div>
     <footer class="kc__foot home-card__foot">
-      <div class="kc__price"><span>Viewing key</span><b>${formatNearYocto(t.price.amount)} / ${t.price.periodDays}d</b></div>
-      <a class="kc__btn kc__btn--wide" href="#/trader/${encodeURIComponent(t.account)}">Buy key</a>
+      <div class="kc__price"><span>Key</span><b>${formatNearYocto(t.price.amount)} / ${t.price.periodDays} days</b></div>
+      <a class="kc__btn home-card__cta" href="#/trader/${encodeURIComponent(t.account)}">View trader</a>
     </footer>
   </article>`;
+}
+
+function howItWorks(): string {
+  const steps: [string, string][] = [
+    ["Verified performance", "Returns are checked and signed before a trader is listed."],
+    ["Buy the key", "One payment unlocks the trader’s hidden trades for 30 days."],
+    ["Agent copies on Solana", "Your copy agent mirrors each trade within the limits you set."],
+  ];
+  return `<section class="how" aria-label="How it works"><h2 class="how__title">How it works</h2><ol class="how__list">${steps
+    .map(([t, d], i) => `<li><span class="how__n">${i + 1}</span><b>${t}</b><p>${d}</p></li>`)
+    .join("")}</ol></section>`;
 }
 
 function renderTraders() {
   const list = listedTraders();
   const note = liveFailed
-    ? `<p class="banner banner--muted">${statusChip("simulated", "Offline")} Could not reach registry — showing saved trader list.</p>`
+    ? `<p class="banner banner--muted">${statusChip("simulated", "Offline")} Could not reach the registry — showing the saved trader list.</p>`
     : "";
-  const body = `<div class="page-head page-head--story">
-    <h1 class="h2">Copy traders whose trades stay private.</h1>
-    <p class="page-lead">Performance is verified. Trades are hidden until you buy their key.</p></div>
-    ${note}<div class="stack stack--home">${list.map((t, i) => homeTraderCard(t, i + 1)).join("")}</div>`;
-  const foot = liveMode ? `${REGISTRY_ID} · NEAR testnet` : "Polypus Keys · NEAR hackathon demo";
-  app.innerHTML = shell("traders", body, foot);
+  const body = `<div class="home">
+    <div class="page-head page-head--story">
+      <h1 class="h2">Copy traders whose trades stay private.</h1>
+      <p class="page-lead">Performance is verified. Trades stay hidden until you buy the trader’s key — then your agent copies them.</p>
+    </div>
+    ${note}<div class="stack stack--home">${list.map((t, i) => homeTraderCard(t, i + 1)).join("")}</div>
+    ${howItWorks()}
+  </div>`;
+  app.innerHTML = shell("traders", body);
 }
 
-function stepper(activeStep: number): string {
-  const steps = ["Verified", "Key bought", "Trades decrypted", "Copied on Solana"];
-  return `<ol class="stepper" aria-label="Progress">${steps
-    .map((label, i) => {
-      const n = i + 1;
-      const cls = n < activeStep ? "is-done" : n === activeStep ? "is-active" : "";
-      return `<li class="${cls}"><span class="stepper__n">${n}</span><span class="stepper__t">${label}</span></li>`;
-    })
-    .join("")}</ol>`;
+/* ---------- shared pieces ---------- */
+
+const STEPS = ["Verified", "Key bought", "Trades decrypted", "Copied on Solana"];
+
+function stepsDone(stage: Stage): number {
+  return { locked: 1, key_bought: 2, decrypted: 3, copied: 4 }[stage];
 }
 
-function proofDrawer(title: string, rows: string, open = false): string {
-  return `<details class="proof"${open ? " open" : ""}><summary>${title}</summary><div class="proof__body"><dl class="proof__dl">${rows}</dl></div></details>`;
+function stepper(stage: Stage): string {
+  const done = stepsDone(stage);
+  const current = done + 1;
+  const items = STEPS.map((label, i) => {
+    const n = i + 1;
+    const cls = n <= done ? "is-done" : n === current ? "is-current" : "is-future";
+    const state = n <= done ? "done" : n === current ? "current" : "not started";
+    return `<li class="${cls}" aria-label="Step ${n}: ${label} (${state})"><span class="stepper__n">${n <= done ? CHECK : n}</span><span class="stepper__t">${label}</span></li>`;
+  }).join("");
+  const now = done >= STEPS.length ? `All done · ${STEPS[STEPS.length - 1]}` : `Step ${current} of ${STEPS.length} · ${STEPS[current - 1]}`;
+  return `<div class="stepper-wrap" data-stepper><ol class="stepper" aria-label="Progress">${items}</ol><p class="stepper__now">${now}</p></div>`;
+}
+
+function proofDrawer(id: string, rows: string, opts: { title?: string; card?: boolean; open?: boolean } = {}): string {
+  const { title = "How do we know?", card = false, open = false } = opts;
+  return `<details class="proof${card ? " proof--card" : ""}" id="${id}"${open ? " open" : ""}><summary><span>${title}</span>${CHEVRON}</summary><div class="proof__body"><dl class="proof__dl">${rows}</dl></div></details>`;
 }
 
 function proofRow(label: string, value: string, title?: string): string {
@@ -142,299 +189,424 @@ function proofRow(label: string, value: string, title?: string): string {
   return `<div><dt>${label}</dt><dd class="mono"${t}>${value}</dd></div>`;
 }
 
-function lockedFeedRow(time: string): string {
-  return `<li class="feed-row feed-row--locked">
-    <div class="feed-row__bars">${redactPills(4)}</div>
-    <time class="feed-row__time">${time}</time>
+/** What the copy agent would place for a trader trade under the default guardrails. */
+function copySize(tr: TradeRecord): { text: string; capped: boolean } {
+  const amt = BigInt(tr.quoteAmount.replace(/\D/g, "") || "0");
+  const scaled = (amt * BigInt(DEFAULT_GUARDRAILS.copyRatioBps)) / 10000n;
+  const max = BigInt(DEFAULT_GUARDRAILS.maxTradeQuote);
+  const capped = scaled > max;
+  return { text: formatUnits((capped ? max : scaled).toString(), tr.quote.decimals, tr.quote.symbol), capped };
+}
+
+function maskText(s: string): string {
+  return s.replace(/[A-Za-z0-9$@]/g, "0");
+}
+
+/* ---------- trader page ---------- */
+
+type TraderCtx = {
+  t: Trader;
+  trades: TradeRecord[];
+  subLive: Awaited<ReturnType<typeof fetchSubscriptionLive>>;
+  snap: FollowerSnapshot | null;
+  gateway: Awaited<ReturnType<typeof fetchGatewaySlice>>;
+  feedRows: number;
+  solanaAddress: string;
+};
+
+const emptyGateway = () => ({ ok: false, signingAddress: "", quoteDigest: "", nonce: "", fetchedAt: new Date().toISOString() });
+
+async function loadTraderCtx(t: Trader): Promise<TraderCtx> {
+  const [subLive, snap, gateway, feed, cs] = await Promise.all([
+    wantLive ? fetchSubscriptionLive().catch(() => null) : Promise.resolve(null),
+    wantLive ? loadFollowerSnapshot().catch(() => null) : Promise.resolve(null),
+    fetchGatewaySlice().catch(emptyGateway),
+    liveMode && wantLive ? fetchFeedLive(t.account, 0, 8).catch(() => []) : Promise.resolve([]),
+    liveMode && wantLive
+      ? chainSigForTrader(t.account, t.derivationPath || "solana-1").catch(() => ({ solanaAddress: "" }))
+      : Promise.resolve({ solanaAddress: "" }),
+  ]);
+  return {
+    t,
+    trades: RECORDED_TRADES.filter(tr => tr.trader === t.account),
+    subLive,
+    snap,
+    gateway: gateway as TraderCtx["gateway"],
+    feedRows: feed.length,
+    solanaAddress: cs.solanaAddress ?? "",
+  };
+}
+
+function copyDecisions(ctx: TraderCtx) {
+  return ctx.t.account === LIVE_TRADER ? (ctx.snap?.decisions ?? []) : [];
+}
+
+function tradeRow(tr: TradeRecord, sealed: boolean): string {
+  const side = `${tr.side.toUpperCase()} ${tr.base.symbol}`;
+  const amount = formatUnits(tr.quoteAmount, tr.quote.decimals, tr.quote.symbol);
+  const price = `@ ${formatUsdPrice(tr.price)}`;
+  const time = formatUtcTime(tr.executedAt);
+  const copy = copySize(tr);
+  const copyText = `You copy ${copy.text}${copy.capped ? " (capped at your max)" : ""}`;
+  const v = (s: string) => (sealed ? maskText(s) : s);
+  return `<li class="feed-row${sealed ? " is-sealed" : ""}">
+    <div class="feed-row__main">
+      <b data-dec>${v(side)}</b>
+      <span data-dec>${v(amount)}</span>
+      <small class="feed-row__copy" data-dec>${v(copyText)}</small>
+    </div>
+    <div class="feed-row__meta">
+      <span data-dec>${v(price)}</span>
+      <time data-dec>${v(time)}</time>
+    </div>
   </li>`;
 }
 
-function tradeFeedHtml(t: Trader, unlocked: boolean): string {
-  const trades = RECORDED_TRADES.filter(tr => tr.trader === t.account);
-  if (!unlocked) {
-    const times = trades.length
-      ? trades.map(tr => tr.executedAt.slice(11, 16))
-      : ["09:14", "11:02", "14:38", "16:51", "18:22", "19:01"];
-    return `<ul class="feed-list feed-list--locked">${times.map(lockedFeedRow).join("")}</ul>`;
+function tradeFeedHtml(ctx: TraderCtx, stage: Stage): string {
+  if (!ctx.trades.length) {
+    return `<ul class="feed-list"><li class="feed-row feed-row--empty"><span>No recent trades to show.</span></li></ul>`;
   }
-  const rows = trades
-    .map(
-      tr => `<li class="feed-row feed-row--open is-hit">
-      <div class="feed-row__main">
-        <b data-dec>${tr.side.toUpperCase()} ${tr.base.symbol}</b>
-        <span data-dec>${formatUnits(tr.quoteAmount, tr.quote.decimals, tr.quote.symbol)}</span>
-      </div>
-      <div class="feed-row__meta">
-        <span class="mono" data-dec>${tr.price}</span>
-        <time data-dec>${tr.executedAt.slice(11, 19)}Z</time>
-      </div>
-    </li>`,
-    )
-    .join("");
-  return `<ul class="feed-list feed-list--open" data-feed>${rows || `<li class="feed-row"><span>No trades in fixture.</span></li>`}</ul>`;
+  const sealed = !isUnlocked(stage);
+  return `<ul class="feed-list" data-feed>${ctx.trades.map(tr => tradeRow(tr, sealed)).join("")}</ul>`;
 }
 
-function plainQuoteLine(q: CheckoutQuote | null, t: Trader, opt: PayOption, loading: boolean, err: string): string {
-  if (loading) return `<p class="buy-quote buy-quote--loading" aria-busy="true"><span class="quote-skel-line"></span></p>`;
-  if (err) return `<p class="buy-quote buy-quote--err">${err}</p>`;
-  if (!q) return `<p class="buy-quote">Choose how you want to pay — we’ll fetch a live exchange quote.</p>`;
-  return `<p class="buy-quote">You pay ~<b>${q.amountInFormatted} ${opt.label}</b> → <b>${t.handle}</b> receives <b>${formatNearYocto(t.price.amount)}</b> for ${t.price.periodDays} days.</p>`;
+function quoteLine(t: Trader): string {
+  if (quoteLoading) return `<p class="buy-quote buy-quote--loading" id="buy-quote" aria-busy="true"><span class="quote-skel-line"></span></p>`;
+  if (quoteError || !quotePreview)
+    return `<p class="buy-quote" id="buy-quote">Pay <b>${formatNearYocto(t.price.amount)}</b> for ${t.price.periodDays} days of access${quoteError ? " (live conversion quote unavailable right now)" : ""}.</p>`;
+  return `<p class="buy-quote" id="buy-quote">Pay about <b>${quotePreview.amountInFormatted} ${payOption.label}</b>, converted to <b>${formatNearYocto(t.price.amount)}</b> for ${t.price.periodDays} days of access.</p>`;
 }
 
-async function fetchQuoteForTrader(t: Trader, opt: PayOption): Promise<void> {
+async function fetchQuote(t: Trader, opt: PayOption): Promise<void> {
+  const key = `${t.account}:${opt.id}`;
+  quoteFor = key;
   quoteLoading = true;
   quoteError = "";
   quotePreview = null;
-  quoteFor = `${t.account}:${opt.id}`;
   const q = await dryQuote({
     originAsset: opt.originAsset,
     destinationAsset: QUOTE_DESTINATION,
     amount: opt.amount,
     recipient: "alice.near",
-  });
+  }).catch(() => null);
+  if (quoteFor !== key) return;
   quoteLoading = false;
-  if (!q) quoteError = "Could not fetch a quote for this asset right now.";
+  if (!q) quoteError = "unavailable";
   else quotePreview = q;
+  const el = app.querySelector("#buy-quote");
+  if (el) el.outerHTML = quoteLine(t);
 }
 
-function paySelect(t: Trader, selected: PayOption): string {
+function paySelect(selected: PayOption): string {
   return `<label class="pay-select"><span class="pay-select__label">Pay with</span>
   <select id="pay-with" class="pay-select__input">${PAY_OPTIONS.map(
     o => `<option value="${o.id}"${o.id === selected.id ? " selected" : ""}>${o.label}</option>`,
   ).join("")}</select></label>`;
 }
 
-function buyPanel(t: Trader, unlocked: boolean, quoteLine: string): string {
-  const bought = unlocked;
-  return `<aside class="buy-panel panel">
-    <h2 class="buy-panel__title">Buy ${t.handle}'s key</h2>
-    <p class="buy-panel__price">${formatNearYocto(t.price.amount)} <span>/ ${t.price.periodDays} days</span></p>
-    ${paySelect(t, payOption)}
-    ${quoteLine}
-  <button type="button" class="kc__btn kc__btn--wide buy-panel__cta" id="btn-buy-key"${bought ? " disabled" : ""}>${bought ? "Key active" : "Buy key"}</button>
-    <p class="buy-panel__hint">Settles on NEAR testnet registry. Mainnet Intents when funded.</p>
+function buyPanel(ctx: TraderCtx, stage: Stage): string {
+  const { t } = ctx;
+  const bought = isUnlocked(stage);
+  const head = `<h2 class="buy-panel__title">${bought ? `${t.handle}'s key` : `Buy ${t.handle}'s key`}</h2>
+    <p class="buy-panel__price">${formatNearYocto(t.price.amount)} <span>/ ${t.price.periodDays} days</span></p>`;
+  if (!bought) {
+    return `<aside class="buy-panel panel" id="buy-panel">${head}
+      ${paySelect(payOption)}
+      ${quoteLine(t)}
+      <button type="button" class="kc__btn kc__btn--wide buy-panel__cta" id="btn-buy-key">Buy key</button>
+      <button type="button" class="text-btn buy-panel__demo" id="btn-demo-unlock">Skip payment — demo unlock</button>
+      <p class="buy-panel__hint">Testnet demo — no real funds.</p>
+    </aside>`;
+  }
+  const keyProof = proofDrawer(
+    "proof-key",
+    `${proofRow("Copy agent account", LIVE_FOLLOWER)}
+    ${proofRow("Subscription on registry", ctx.subLive ? `${ctx.subLive.status} (${displayNearAccount(ctx.subLive.follower)} → ${displayNearAccount(ctx.subLive.trader)})` : "Demo unlock — no payment")}
+    ${ctx.subLive?.agent_pubkey ? proofRow("Agent key", truncate(ctx.subLive.agent_pubkey), ctx.subLive.agent_pubkey) : ""}
+    ${proofRow("Encrypted feed rows", ctx.feedRows ? String(ctx.feedRows) : "—")}
+    ${proofRow("Registry", REGISTRY_ID)}`,
+  );
+  return `<aside class="buy-panel panel" id="buy-panel">${head}
+    <p class="buy-quote">Your copy agent holds this key for ${t.price.periodDays} days. It reads the trades; nobody else can.</p>
+    <button type="button" class="kc__btn kc__btn--wide buy-panel__cta is-done" id="btn-buy-key" disabled>Key active ${CHECK}</button>
+    ${keyProof}
+    <p class="buy-panel__hint">Testnet demo — no real funds.</p>
   </aside>`;
 }
 
-function storyBanner(unlocked: boolean): string {
-  if (!unlocked) return "";
-  return `<p class="story-banner">${statusChip("live", "Unlocked")} Key delivered to your copy agent — it never leaves the secure enclave.</p>`;
+function storyBanner(ctx: TraderCtx, stage: Stage): string {
+  if (!isUnlocked(stage)) return "";
+  const h = ctx.t.handle;
+  const willCopy = copyDecisions(ctx).length > 0;
+  const text =
+    stage === "key_bought"
+      ? `Key delivered to your copy agent. Decrypting ${h}’s trades…`
+      : stage === "decrypted"
+        ? willCopy
+          ? `Trades decrypted. Your agent is copying the latest one on Solana…`
+          : `Trades decrypted. Your agent will copy ${h}’s next trade on Solana.`
+        : `Your agent copied ${h}’s latest trade on Solana, within your limits.`;
+  const jump = stage === "copied" ? `<button type="button" class="text-btn story-banner__jump" data-scroll="copy-agent">See the copy ↓</button>` : "";
+  return `<div class="story-banner" role="status">${statusChip("live", "Unlocked")}<span>${text}</span>${jump}</div>`;
 }
 
-function copyAgentSection(
-  showingLive: boolean,
-  snap: Awaited<ReturnType<typeof loadFollowerSnapshot>>,
-  decisions: NonNullable<Awaited<ReturnType<typeof loadFollowerSnapshot>>>["decisions"],
-  inferenceFootnote: string,
-): string {
-  const maxQuote = formatUnits(DEFAULT_GUARDRAILS.maxTradeQuote, 6, "pUSD");
-  const ratio = `${DEFAULT_GUARDRAILS.copyRatioBps / 100}% of trader size`;
-  const tokens = DEFAULT_GUARDRAILS.allowedTokens.join(", ");
-  const rows =
-    decisions && decisions.length
-      ? decisions
-          .map(d => {
-            const link = d.devnetTx
-              ? `<a class="copy-trade__link" href="https://explorer.solana.com/tx/${d.devnetTx}?cluster=devnet" target="_blank" rel="noopener">View on Solana ↗</a>`
-              : "";
-            return `<li class="copy-trade"><div><b>${d.action} ${d.side} ${d.symbol}</b><small>${d.quoteHuman} · within your limits</small></div>
-            <div class="copy-trade__end">${link}<span class="copy-trade__status">Settled</span></div></li>`;
-          })
-          .join("")
-      : `<li class="copy-trade copy-trade--empty"><span>Copied trades appear here after the agent runs.</span></li>`;
+function copiedRow(d: FollowerSnapshot["decisions"][number], sealed: boolean): string {
+  const verb = d.action === "copy" ? "Copied" : d.action.charAt(0).toUpperCase() + d.action.slice(1);
+  const amount = d.quoteHuman.replace(/^(\d+)/, m => groupThousands(m));
+  const when = `${new Date(d.at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}, ${formatUtcTime(d.at)}`;
+  const link = d.devnetTx
+    ? `<a class="copy-trade__link" href="https://explorer.solana.com/tx/${d.devnetTx}?cluster=devnet" target="_blank" rel="noopener">View on Solana ↗</a>`
+    : "";
+  return `<li class="copy-trade${sealed ? " is-new" : ""}">
+    <div class="copy-trade__main"><b data-dec>${verb} ${d.side.toUpperCase()} ${d.symbol} · ${amount}</b><small>${when} · within your limits</small></div>
+    <div class="copy-trade__end"><span class="copy-trade__status">${CHECK} Settled</span>${link}</div>
+  </li>`;
+}
 
-  return `<section class="agent-section panel" id="copy-agent">
-    <h2>Your agent copies within your limits</h2>
+function copyAgentSection(ctx: TraderCtx, stage: Stage, animateCopy: boolean): string {
+  const decisions = copyDecisions(ctx);
+  const maxQuote = formatUnits(DEFAULT_GUARDRAILS.maxTradeQuote, 6, "pUSD");
+  const ratio = `${DEFAULT_GUARDRAILS.copyRatioBps / 100}% of the trader’s size`;
+  const tokens = DEFAULT_GUARDRAILS.allowedTokens.join(", ");
+
+  let rows: string;
+  if (stage === "copied" && decisions.length) rows = decisions.map(d => copiedRow(d, animateCopy)).join("");
+  else {
+    const msg =
+      stage === "locked"
+        ? `Nothing copied yet — buy the key and your agent starts copying ${ctx.t.handle}.`
+        : stage === "key_bought"
+          ? "Waiting for decrypted trades…"
+          : decisions.length
+            ? "Placing the copy on Solana…"
+            : `Your agent will copy ${ctx.t.handle}’s next trade.`;
+    rows = `<li class="copy-trade copy-trade--empty"><span>${msg}</span></li>`;
+  }
+
+  const inferenceSim = decisions.some(d => /SIMULATED|simulated inference/i.test(d.explanation ?? ""));
+  const latestTx = decisions.find(d => d.devnetTx)?.devnetTx;
+  const copyProof = proofDrawer(
+    "proof-copy",
+    `${proofRow("Live pair", `${displayNearAccount(LIVE_FOLLOWER)} follows ${displayNearAccount(LIVE_TRADER)}`)}
+    ${latestTx ? proofRow("Latest Solana tx", truncate(latestTx), latestTx) : ""}
+    ${ctx.solanaAddress ? proofRow("Trader’s Solana address", truncate(ctx.solanaAddress), ctx.solanaAddress) : ""}
+    ${ctx.snap?.guardrailsHash ? proofRow("Limits fingerprint", truncate(ctx.snap.guardrailsHash), ctx.snap.guardrailsHash) : ""}
+    ${ctx.gateway.signingAddress ? proofRow("Gateway signer", displayEvmAddress(ctx.gateway.signingAddress), ctx.gateway.signingAddress) : ""}
+    ${proofRow("Agent reasoning", inferenceSim ? "Simulated — needs a NEAR AI key for enclave inference" : "NEAR AI enclave")}`,
+  );
+
+  return `<section class="agent-section panel${isUnlocked(stage) ? "" : " is-idle"}" id="copy-agent">
+    <div class="agent-section__head">
+      <div><h2>Your copy agent</h2><p class="panel__sub">Copies ${ctx.t.handle} on Solana — only within the limits you set.</p></div>
+    </div>
     <ul class="guardrail-plain">
       <li><span>Max per trade</span><b>${maxQuote}</b></li>
-      <li><span>Size</span><b>${ratio}</b></li>
+      <li><span>Copy size</span><b>${ratio}</b></li>
       <li><span>Tokens</span><b>${tokens}</b></li>
     </ul>
-    <ul class="copy-trades">${rows}</ul>
-    ${inferenceFootnote}
-    <p class="agent-foot">${showingLive ? `Following ${displayNearAccount(LIVE_TRADER)} as ${displayNearAccount(LIVE_FOLLOWER)}` : "Demo follower pair on testnet."}</p>
+    <h3 class="agent-section__label">Copied trades</h3>
+    <ul class="copy-trades" data-copies>${rows}</ul>
+    ${copyProof}
   </section>`;
 }
 
-async function renderTrader(id: string) {
+type PaintOpts = { animateFeed?: boolean; animateCopy?: boolean };
+
+function paintTrader(ctx: TraderCtx, opts: PaintOpts = {}): { decryptFeed: () => Promise<void>; decryptCopy: () => Promise<void> } {
+  const { t } = ctx;
+  const stage = stageOf(t.account);
+  const openDrawers = new Set([...app.querySelectorAll<HTMLDetailsElement>("details[open]")].map(d => d.id));
+  const n = t.pnl.tradeCount;
+
+  const perfProof = proofDrawer(
+    "proof-perf",
+    `${proofRow("Registry", REGISTRY_ID)}
+    ${proofRow("Trader", displayNearAccount(t.account))}
+    ${proofRow("Return", pnlPercent(t.pnl.pnlBps))}
+    ${!isPlaceholderKey(t.pnl.attestation.signerPublicKey) ? proofRow("Attestor", truncate(t.pnl.attestation.signerPublicKey), t.pnl.attestation.signerPublicKey) : proofRow("Attestor", displayAttestorRef(t.pnl.attestation.signerPublicKey, t.pnl.attestation.measurement, t.pnl.attestation.kind))}
+    ${proofRow("Signed statement", t.pnl.signature ? truncate(t.pnl.signature) : "—")}`,
+  );
+
+  const unlocked = isUnlocked(stage);
+  const body = `<div class="trader-story" data-stage="${stage}">
+    <header class="trader-head">
+      <div class="trader-head__who"><h1 class="h2">${t.handle}</h1><p class="trader-head__acct">${displayNearAccount(t.account)}</p></div>
+      <dl class="trader-head__stats">
+        <div><dt>Verified return</dt><dd>${pnlPercent(t.pnl.pnlBps)}</dd></div>
+        <div><dt>Trades</dt><dd>${groupThousands(n)}</dd></div>
+        <div><dt>Key</dt><dd>${formatNearYocto(t.price.amount)}</dd></div>
+      </dl>
+    </header>
+    ${stepper(stage)}
+    ${storyBanner(ctx, stage)}
+    <div class="trader-layout">
+      <section class="trader-feed panel">
+        <h2>${unlocked ? "Their trades — unlocked for you" : "Their trades are hidden"}</h2>
+        <p class="panel__sub">${unlocked ? "Only you and your copy agent can read these." : `Buy the key to read them. Your agent then copies them for you.`}</p>
+        ${tradeFeedHtml(ctx, stage)}
+        ${perfProof}
+      </section>
+      ${buyPanel(ctx, stage)}
+    </div>
+    ${copyAgentSection(ctx, stage, !!opts.animateCopy)}
+  </div>`;
+
+  app.innerHTML = shell("traders", body);
+  for (const id of openDrawers) app.querySelector<HTMLDetailsElement>(`#${id}`)?.setAttribute("open", "");
+  document.body.dataset.stage = stage;
+
+  const feed = app.querySelector<HTMLElement>("[data-feed]");
+  const noop = () => Promise.resolve();
+  const decryptFeed = feed && (!unlocked || opts.animateFeed) ? sealCells(feed) : noop;
+  const copies = app.querySelector<HTMLElement>("[data-copies]");
+  const decryptCopy = copies && opts.animateCopy ? sealCells(copies) : noop;
+  return { decryptFeed: unlocked ? decryptFeed : noop, decryptCopy };
+}
+
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** KEY_BOUGHT -> DECRYPTED -> COPIED, with the decode animations in between. */
+async function runUnlock(ctx: TraderCtx, seq: number): Promise<void> {
+  const acct = ctx.t.account;
+  if (!advance(acct, "key_bought")) return;
+  document.body.dataset.anim = "1";
+  try {
+    const { decryptFeed } = paintTrader(ctx, { animateFeed: true });
+    bindTrader(ctx, seq);
+    await wait(250);
+    await decryptFeed();
+    if (seq !== renderSeq) return;
+    advance(acct, "decrypted");
+    paintTrader(ctx);
+    bindTrader(ctx, seq);
+    if (!copyDecisions(ctx).length) return;
+    await wait(700);
+    if (seq !== renderSeq) return;
+    advance(acct, "copied");
+    const { decryptCopy } = paintTrader(ctx, { animateCopy: true });
+    bindTrader(ctx, seq);
+    await decryptCopy();
+  } finally {
+    if (seq === renderSeq) document.body.dataset.anim = "0";
+  }
+}
+
+function bindTrader(ctx: TraderCtx, seq: number) {
+  const { t } = ctx;
+  const buy = app.querySelector<HTMLButtonElement>("#btn-buy-key:not([disabled])");
+  buy?.addEventListener("click", async () => {
+    buy.disabled = true;
+    buy.classList.add("is-busy");
+    buy.textContent = "Confirming…";
+    app.querySelector<HTMLButtonElement>("#btn-demo-unlock")?.setAttribute("disabled", "");
+    await wait(700);
+    if (seq === renderSeq) void runUnlock(ctx, seq);
+  });
+  app.querySelector("#btn-demo-unlock")?.addEventListener("click", () => void runUnlock(ctx, seq));
+  app.querySelector<HTMLSelectElement>("#pay-with")?.addEventListener("change", e => {
+    const opt = PAY_OPTIONS.find(o => o.id === (e.target as HTMLSelectElement).value) ?? PAY_OPTIONS[0]!;
+    payOption = opt;
+    setPayOptionId(t.account, opt.id);
+    const q = app.querySelector("#buy-quote");
+    quoteLoading = true;
+    if (q) q.outerHTML = quoteLine(t);
+    void fetchQuote(t, opt);
+  });
+  app.querySelectorAll<HTMLElement>("[data-scroll]").forEach(el =>
+    el.addEventListener("click", () => app.querySelector(`#${el.dataset.scroll}`)?.scrollIntoView({ behavior: "smooth", block: "start" })),
+  );
+}
+
+async function renderTrader(id: string, seq: number) {
   const acct = decodeURIComponent(id);
   const t = listedTraders().find(x => x.account === acct) ?? listedTraders()[0];
   if (!t) {
-    app.innerHTML = shell("traders", `<p class="page-lead">No verified traders yet.</p>`, "");
+    app.innerHTML = shell("traders", `<p class="page-lead">No verified traders yet.</p>`);
     return;
   }
 
   const storedPay = getPayOptionId(t.account);
   payOption = PAY_OPTIONS.find(o => o.id === storedPay) ?? PAY_OPTIONS[0]!;
+  if (quoteFor !== `${t.account}:${payOption.id}`) void fetchQuote(t, payOption);
 
-  const subLive = wantLive ? await fetchSubscriptionLive().catch(() => null) : null;
-  const snap = wantLive ? await loadFollowerSnapshot().catch(() => null) : null;
-  const gateway = await fetchGatewaySlice().catch(() => ({
-    ok: false,
-    signingAddress: "",
-    quoteDigest: "",
-    nonce: "",
-    fetchedAt: new Date().toISOString(),
-  }));
-  const feedMeta =
-    liveMode && wantLive
-      ? await fetchFeedLive(t.account, 0, 8).catch(() => [])
-      : [];
-  const cs =
-    liveMode && wantLive
-      ? await chainSigForTrader(t.account, t.derivationPath || "solana-1").catch(() => ({ solanaAddress: "" }))
-      : { solanaAddress: "" };
-
-  const demo = isDemoUnlocked();
-  const hasSub = !!(subLive && subLive.trader === t.account) || demo;
-  const keyActive = hasSub || isKeyBought(t.account);
-  const unlocked = demo || isKeyBought(t.account) || !!(subLive && subLive.trader === t.account);
-  const decisions = snap?.decisions ?? [];
-  const copied = decisions.some(d => !!d.devnetTx);
-  const step = copied ? 4 : unlocked ? 3 : keyActive ? 2 : hasPnlStatement(t) ? 1 : 1;
-
-  const quoteKey = `${t.account}:${payOption.id}`;
-  if (quoteFor !== quoteKey) {
-    quoteLoading = true;
-    void fetchQuoteForTrader(t, payOption).then(() => renderTrader(id));
-  }
-
-  const proofVerified = proofDrawer(
-    "How do we know performance is verified?",
-  `${proofRow("Registry", REGISTRY_ID)}
-  ${proofRow("Trader", displayNearAccount(t.account))}
-  ${proofRow("Return", pnlPercent(t.pnl.pnlBps))}
-  ${!isPlaceholderKey(t.pnl.attestation.signerPublicKey) ? proofRow("Attestor", truncate(t.pnl.attestation.signerPublicKey), t.pnl.attestation.signerPublicKey) : ""}
-  ${proofRow("Statement", t.pnl.signature ? truncate(t.pnl.signature) : "—")}`,
-  );
-
-  const proofKey = proofDrawer(
-    "How do we know the key is yours?",
-    `${proofRow("Follower", LIVE_FOLLOWER)}
-    ${subLive ? proofRow("Subscription", subLive.status) : proofRow("Subscription", demo ? "Demo unlock (judge)" : "—")}
-    ${proofRow("Encrypted feed rows", String(feedMeta.length || "—"))}`,
-  );
-
-  const proofCopy = proofDrawer(
-    "How do we know copies settled?",
-    `${gateway.signingAddress ? proofRow("Gateway signer", displayEvmAddress(gateway.signingAddress), gateway.signingAddress) : ""}
-    ${proofRow("Guardrails", snap?.guardrailsHash ? truncate(snap.guardrailsHash) : "—")}
-    ${cs.solanaAddress ? proofRow("Chain Signatures Solana", truncate(cs.solanaAddress), cs.solanaAddress) : ""}
-    ${decisions[0]?.devnetTx ? proofRow("Latest Solana tx", truncate(decisions[0].devnetTx), decisions[0].devnetTx) : ""}`,
-  );
-
-  const inferenceSim = decisions.some(d => /SIMULATED|simulated inference/i.test(d.explanation ?? ""));
-  const inferenceFootnote = inferenceSim
-    ? `<p class="footnote-chip">${statusChip("simulated", "Enclave inference simulated")} · needs NEAR AI key</p>`
-  : "";
-
-  const demoToggle = `<button type="button" class="demo-toggle" id="btn-demo-unlock">${demo ? "Hide demo unlock" : "See it unlocked (demo)"}</button>`;
-
-  const body = `<div class="trader-story">
-    ${stepper(step)}
-    ${storyBanner(unlocked)}
-    <div class="trader-story__head">
-      <h1 class="h2">${t.handle}</h1>
-      <p class="page-lead">${displayNearAccount(t.account)}</p>
-      ${demoToggle}
-    </div>
-    <div class="trader-layout">
-      <div class="trader-feed panel">
-        <h2>${unlocked ? "Their trades (for you only)" : "Their trades (hidden)"}</h2>
-        <p class="panel__sub">${unlocked ? "Decrypted inside your agent — not in this browser." : "Buy the key to decrypt inside your copy agent."}</p>
-        ${tradeFeedHtml(t, unlocked)}
-        ${proofVerified}
-      </div>
-      ${buyPanel(t, keyActive, plainQuoteLine(quotePreview, t, payOption, quoteLoading, quoteError))}
-    </div>
-    ${unlocked ? proofKey : ""}
-    ${unlocked && t.account === LIVE_TRADER ? copyAgentSection(!!(subLive || snap), snap, decisions, inferenceFootnote) : ""}
-    ${unlocked && copied ? proofCopy : ""}
-  </div>`;
-
-  app.innerHTML = shell("traders", body, liveMode ? `${REGISTRY_ID} · NEAR testnet` : "Polypus Keys");
-  app.querySelector<HTMLElement>("[data-feed]") && revealFeed(app.querySelector("[data-feed]")!, unlocked);
-
-  app.querySelector("#btn-demo-unlock")?.addEventListener("click", () => {
-    setDemoUnlocked(!demo);
-    if (!demo) setKeyBought(t.account);
-    void renderTrader(id);
-  });
-  app.querySelector("#btn-buy-key")?.addEventListener("click", () => {
-    setKeyBought(t.account);
-    void renderTrader(id);
-  });
-  app.querySelector<HTMLSelectElement>("#pay-with")?.addEventListener("change", e => {
-    const opt = PAY_OPTIONS.find(o => o.id === (e.target as HTMLSelectElement).value) ?? PAY_OPTIONS[0]!;
-    payOption = opt;
-    setPayOptionId(t.account, opt.id);
-    quoteFor = null;
-    quotePreview = null;
-    void fetchQuoteForTrader(t, opt).then(() => renderTrader(id));
-  });
+  const ctx = await loadTraderCtx(t);
+  if (seq !== renderSeq) return;
+  paintTrader(ctx);
+  bindTrader(ctx, seq);
+  document.body.dataset.anim = "0";
+  if (demoRequested() && stageOf(t.account) === "locked") void runUnlock(ctx, seq);
 }
 
-async function renderAgent() {
-  const t = traders.find(x => x.account === LIVE_TRADER) ?? listedTraders()[0];
+/* ---------- my agent ---------- */
+
+async function renderAgent(seq: number) {
+  const acct = anyUnlocked();
+  const t = acct ? traders.find(x => x.account === acct) : undefined;
   if (!t) {
-    app.innerHTML = shell("agent", `<p class="page-lead">Subscribe to a trader to run your copy agent.</p>`, "");
+    const first = listedTraders()[0];
+    app.innerHTML = shell(
+      "agent",
+      `<div class="home"><div class="page-head page-head--story">
+        <h1 class="h2">My copy agent</h1>
+        <p class="page-lead">You don’t have an agent yet. Buy a trader’s key and your agent starts copying their trades on Solana, within your limits.</p>
+      </div>
+      ${first ? `<a class="kc__btn" href="#/trader/${encodeURIComponent(first.account)}">Browse traders</a>` : ""}</div>`,
+    );
+    document.body.dataset.stage = "locked";
     return;
   }
-  const snap = wantLive ? await loadFollowerSnapshot().catch(() => null) : null;
-  const subLive = wantLive ? await fetchSubscriptionLive().catch(() => null) : null;
-  const decisions = snap?.decisions ?? [];
-  const copied = decisions.some(d => !!d.devnetTx);
-  const inferenceSim = decisions.some(d => /SIMULATED|simulated inference/i.test(d.explanation ?? ""));
-  const inferenceFootnote = inferenceSim
-    ? `<p class="footnote-chip">${statusChip("simulated", "Enclave inference simulated")} · needs NEAR AI key</p>`
-    : "";
-  const body = `<div class="page-head page-head--story">
-    <h1 class="h2">My copy agent</h1>
-    <p class="page-lead">Runs in a secure enclave — you set limits; it copies ${t.handle} on Solana.</p></div>
-    ${stepper(copied ? 4 : 3)}
-    <p class="story-banner">${statusChip("live", "Agent")} Subscribed to ${displayNearAccount(LIVE_TRADER)}.</p>
-    ${copyAgentSection(!!(subLive || snap), snap, decisions, inferenceFootnote)}
-    <p style="margin-top:var(--s5)"><a class="kc__btn" href="#/trader/${encodeURIComponent(t.account)}">View ${t.handle}'s story</a></p>`;
-  app.innerHTML = shell("agent", body, liveMode ? `${REGISTRY_ID} · NEAR testnet` : "Polypus Keys");
+  const ctx = await loadTraderCtx(t);
+  if (seq !== renderSeq) return;
+  const stage = stageOf(t.account);
+  const body = `<div class="home">
+    <div class="page-head page-head--story">
+      <h1 class="h2">My copy agent</h1>
+      <p class="page-lead">Copying ${t.handle} on Solana, within the limits you set.</p>
+    </div>
+    ${stepper(stage)}
+    ${copyAgentSection(ctx, stage, false)}
+    <p class="agent-back"><a class="text-btn" href="#/trader/${encodeURIComponent(t.account)}">← Back to ${t.handle}</a></p>
+  </div>`;
+  app.innerHTML = shell("agent", body);
+  document.body.dataset.stage = stage;
 }
 
-async function renderProof() {
-  const dev = await loadDevnetSettlements();
-  const s = dev.at(-1) ?? RECORDED_SETTLEMENTS[0];
-  const t = traders.find(x => x.account === LIVE_TRADER) ?? listedTraders()[0];
-  const gateway = await fetchGatewaySlice().catch(() => ({
-    ok: false,
-    signingAddress: "",
-    quoteDigest: "",
-    nonce: "",
-    fetchedAt: new Date().toISOString(),
-  }));
+/* ---------- proof ---------- */
 
-  const body = `<div class="page-head page-head--story"><h1 class="h2">Proof &amp; explorer</h1>
-  <p class="page-lead">Technical artifacts for reviewers — not required to use the product.</p></div>
+async function renderProof(seq: number) {
+  const dev = await loadDevnetSettlements();
+  const s = dev.at(-1) ?? RECORDED_SETTLEMENTS[0]!;
+  const t = traders.find(x => x.account === LIVE_TRADER) ?? listedTraders()[0];
+  const gateway = await fetchGatewaySlice().catch(emptyGateway);
+  if (seq !== renderSeq) return;
+
+  const body = `<div class="home"><div class="page-head page-head--story"><h1 class="h2">Proof &amp; explorer</h1>
+  <p class="page-lead">Technical artifacts for reviewers — not needed to use the product.</p></div>
   <div class="stack">
     ${proofDrawer(
-      "Registry &amp; attestor",
+      "pp-registry",
       `${proofRow("Contract", REGISTRY_ID)}
       ${t ? proofRow("Trader", displayNearAccount(t.account)) : ""}
       ${t && !isPlaceholderKey(t.pnl.attestation.signerPublicKey) ? proofRow("Attestor pubkey", truncate(t.pnl.attestation.signerPublicKey), t.pnl.attestation.signerPublicKey) : ""}
       ${t ? proofRow("Attestor ref", displayAttestorRef(t.pnl.attestation.signerPublicKey, t.pnl.attestation.measurement, t.pnl.attestation.kind)) : ""}`,
-      true,
+      { title: "Registry &amp; attestor", card: true, open: true },
     )}
     ${proofDrawer(
-      "NEAR AI gateway",
+      "pp-gateway",
       `${gateway.signingAddress ? proofRow("Signer", displayEvmAddress(gateway.signingAddress), gateway.signingAddress) : proofRow("Signer", "—")}
       ${proofRow("Quote digest", gateway.quoteDigest ? truncate(gateway.quoteDigest) : "—")}
       ${proofRow("Fetched", gateway.fetchedAt)}`,
+      { title: "NEAR AI gateway", card: true },
     )}
     ${proofDrawer(
-      "Solana devnet settlement",
+      "pp-solana",
       `${proofRow("Signature", truncate(s.signature))}
       ${proofRow("Pool", truncate(s.pool))}
-      ${proofRow("Nullifier", truncate(s.nullifiers[0]))}`,
+      ${proofRow("Nullifier", truncate(s.nullifiers[0]!))}`,
+      { title: "Solana devnet settlement", card: true },
     )}
-  </div>`;
-  app.innerHTML = shell("proof", body, "Polypus Keys · proof view");
+  </div></div>`;
+  app.innerHTML = shell("proof", body);
 }
 
 async function refreshLive() {
@@ -453,11 +625,15 @@ async function refreshLive() {
 }
 
 async function render() {
+  const seq = ++renderSeq;
   const { page, id } = route();
-  if (page === "trader") await renderTrader(id ?? listedTraders()[0]?.account ?? LIVE_TRADER);
-  else if (page === "agent") await renderAgent();
-  else if (page === "proof") await renderProof();
+  delete document.body.dataset.stage;
+  document.body.dataset.anim = "0";
+  if (page === "trader") await renderTrader(id ?? listedTraders()[0]?.account ?? LIVE_TRADER, seq);
+  else if (page === "agent") await renderAgent(seq);
+  else if (page === "proof") await renderProof(seq);
   else renderTraders();
+  if (seq === renderSeq) window.scrollTo(0, 0);
 }
 
 window.addEventListener("hashchange", () => void render());
