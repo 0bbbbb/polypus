@@ -26,7 +26,6 @@ function attestor(): { x25519: string; ed25519: string } {
 const att = attestor();
 const binding = await agentAttestationBinding(att.ed25519);
 const history: Partial<Record<Sym, [number, number][]>> = {};
-for (const s of SYMS) history[s] = await priceHistory(s, 5);
 
 for (const account of TRADERS) {
   const t = await view<TraderOnChain | null>("get_trader", { account });
@@ -85,6 +84,7 @@ for (const account of TRADERS) {
     log.info(`${t.handle}: epoch ${epoch} already has ${existing.length} trades; no backfill`);
     continue;
   }
+  for (const s of SYMS) history[s] ??= await priceHistory(s, 5);
   const n = COUNTS[t.handle] ?? 10;
   const now = Date.now();
   const start = now - 4 * 864e5;
