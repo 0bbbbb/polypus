@@ -351,6 +351,9 @@ a.tt__row:hover .tt__go { color: var(--ink); transform: translateX(3px); }
 .buy__err { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #fbf1f0; color: #8f2219; font-size: 13px; }
 .buy__fine { margin-top: 12px; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
 .active .dl { margin-top: 16px; }
+.active__renew { display: block; margin: 12px auto 0; color: var(--ink-2); }
+.active__renew:disabled { opacity: 0.5; }
+.gr__edit { margin-top: 10px; }
 .active__tl { margin: 8px 0 16px; padding-top: 14px; box-shadow: inset 0 1px 0 var(--line); }
 .ok { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
 
@@ -620,6 +623,7 @@ a.tt__row:hover .tt__go { color: var(--ink); transform: translateX(3px); }
   .card__head { margin-inline: -16px; padding: 0 16px; min-height: 52px; }
   .card--flush { padding: 0; }
   .card--flush > .card__head { margin: 0; }
+  .prog__bar { margin-inline: -16px; }
   .card__meta .muted { display: none; }
   .tt__head { display: none; }
   .tt__row {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "../api/client";
-import type { DecryptedTrade, FeedRow, Guardrails, KeyHolding, Timeline as TL, TraderDetail, TraderSummary, TxRef } from "../api/types";
+import type { DecryptedTrade, FeedRow, Guardrails, KeyHolding, Timeline as TL, TraderDetail, TraderSummary } from "../api/types";
 import { EquityChart } from "../components/charts";
 import { GuardrailsEditor, GuardrailsSummary } from "../components/Guardrails";
 import { PayAnyChain } from "../components/PayAnyChain";
@@ -9,7 +9,7 @@ import { AddrLink, Ago, Avatar, Card, Copyable, Dec, Empty, IArrow, ICheck, IChe
 import { clock, compactUsd, date, dateTime, daysLeft, near, num, pct, short, usd } from "../lib/format";
 import { useAsync, useMedia } from "../lib/hooks";
 import { href } from "../lib/router";
-import { buyWithDemo, buyWithWallet, DEFAULT_GUARDRAILS, errText } from "../state/actions";
+import { buyWithDemo, buyWithWallet, DEFAULT_GUARDRAILS, errText, renewKey } from "../state/actions";
 import { tlKey, useStore } from "../state/store";
 
 export function Trader({ account }: { account: string }) {
@@ -21,7 +21,6 @@ export function Trader({ account }: { account: string }) {
   const portfolio = useStore(s => s.portfolio);
   const holding = portfolio && portfolio.follower === identity?.account ? portfolio.keys.find(k => k.trader === account && k.status === "active") ?? null : null;
   const tl = useStore(s => (identity ? s.timelines[tlKey(identity.account, account)] : undefined));
-  const [justBought, setJustBought] = useState<{ follower: string; tx: TxRef } | null>(null);
 
   const d: TraderSummary | TraderDetail | null = detail.data ?? summary;
   if (!d) {
@@ -39,8 +38,7 @@ export function Trader({ account }: { account: string }) {
 
   const merged = { ...d, ...(summary ?? {}) } as TraderSummary;
   const feed = detail.data?.feed ?? null;
-  const timeline: TL | null =
-    tl ?? holding?.timeline ?? (justBought && justBought.follower === identity?.account ? provisional(justBought.follower, account, justBought.tx) : null);
+  const timeline: TL | null = tl ?? holding?.timeline ?? null;
   const inFlight = !!timeline && !timeline.complete;
 
   return (
@@ -57,29 +55,17 @@ export function Trader({ account }: { account: string }) {
         <aside class="tgrid__side" id="buy">
           {holding && !inFlight ? (
             <ActivePanel t={merged} h={holding} timeline={timeline ?? holding.timeline} />
-          ) : timeline && (holding || justBought) ? (
+          ) : timeline && (holding || inFlight) ? (
             <ProgressPanel t={merged} timeline={timeline} />
           ) : (
-            <BuyPanel t={merged} onBought={(follower, tx) => setJustBought({ follower, tx })} />
+            <BuyPanel t={merged} />
           )}
-          {!holding && !justBought && <PayAnyChain trader={merged.account} />}
+          {!holding && !inFlight && <PayAnyChain trader={merged.account} />}
         </aside>
       </div>
-      {!holding && !justBought && <MobileCta t={merged} />}
+      {!holding && !inFlight && <MobileCta t={merged} />}
     </main>
   );
-}
-
-function provisional(follower: string, trader: string, tx: TxRef): TL {
-  return {
-    follower, trader, agentPubkey: "", complete: false,
-    steps: [
-      { key: "subscribed", label: "Subscribed", status: "active", detail: "Waiting for the registry to confirm", txs: [tx], at: Date.now() },
-      { key: "sealed", label: "Key sealed to agent", status: "waiting", detail: "", txs: [] },
-      { key: "decrypted", label: "Trades decrypted", status: "waiting", detail: "", txs: [] },
-      { key: "copied", label: "Copied on Solana", status: "waiting", detail: "", txs: [] },
-    ],
-  };
 }
 
 function TraderHeader({ t }: { t: TraderSummary }) {
@@ -272,7 +258,7 @@ function OpenRow({ r, x, trader, i }: { r: FeedRow; x: DecryptedTrade; trader: s
   );
 }
 
-function BuyPanel({ t, onBought }: { t: TraderSummary; onBought: (follower: string, tx: TxRef) => void }) {
+function BuyPanel({ t }: { t: TraderSummary }) {
   const walletAcc = useStore(s => s.wallet);
   const health = useStore(s => s.health);
   const [g, setG] = useState<Guardrails>(DEFAULT_GUARDRAILS);
@@ -287,10 +273,7 @@ function BuyPanel({ t, onBought }: { t: TraderSummary; onBought: (follower: stri
     setErr(null);
     try {
       if (kind === "wallet") await buyWithWallet(t.account, g);
-      else {
-        const tx = await buyWithDemo(t.account, g);
-        onBought(health?.demo.account ?? "carol-18e5.testnet", tx);
-      }
+      else await buyWithDemo(t.account, g);
     } catch (e) {
       const ae = e as { status?: number; retryAfterSec?: number };
       if (ae.status === 429) setRetryAt(Date.now() + (ae.retryAfterSec ?? 30) * 1000);
@@ -362,6 +345,13 @@ function ProgressPanel({ t, timeline }: { t: TraderSummary; timeline: TL }) {
 
 function ActivePanel({ t, h, timeline }: { t: TraderSummary; h: KeyHolding; timeline: TL }) {
   const lastCopy = h.copies[0];
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const renew = async () => {
+    setBusy(true);
+    setErr(null);
+    try { await renewKey(t.account, h.guardrails ?? DEFAULT_GUARDRAILS); } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
+  };
   return (
     <section class="card active">
       <header class="buy__top">
@@ -382,6 +372,10 @@ function ActivePanel({ t, h, timeline }: { t: TraderSummary; h: KeyHolding; time
         <Timeline timeline={timeline} compact />
       </div>
       <a class="btn btn--line btn--block" href={href.portfolio}>Open portfolio <IArrow size={12} /></a>
+      <button type="button" class="linkbtn active__renew" disabled={busy} onClick={renew}>
+        {busy ? "Renewing" : `Renew for ${near(t.priceNear)} NEAR`}
+      </button>
+      {err && <p class="buy__err" role="alert">{err}</p>}
     </section>
   );
 }

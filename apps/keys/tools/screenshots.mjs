@@ -76,12 +76,12 @@ try {
   for (const t of TRADERS) {
     await big.goto(`${BASE}/#/t/${t}`);
     await big.waitForSelector(".buy, .active, .prog", { timeout: 30000 });
-    const btn = big.getByRole("button", { name: "Try with a demo account" });
-    if (await btn.count() && await btn.isEnabled()) {
-      await btn.click();
+    const start = big.locator(".active__renew, .buy .btn--line").first();
+    if (await start.isEnabled()) {
+      await start.click();
       const ok = await big.waitForSelector(".prog", { timeout: 20000 }).then(() => true, () => false);
       if (ok) { trader = t; break; }
-      console.warn("demo purchase did not start:", await big.locator(".buy__err").textContent().catch(() => "?"));
+      console.warn("purchase did not start:", await big.locator(".buy__err").textContent().catch(() => "?"));
     }
   }
   const demoId = { kind: "demo", account: health.demo?.account ?? "carol-18e5.testnet" };

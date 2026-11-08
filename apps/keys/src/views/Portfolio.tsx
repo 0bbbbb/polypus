@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { CopyRecord, Guardrails, KeyHolding, Portfolio as P, TeeView, TxRef } from "../api/types";
-import { GuardrailsEditor, sameGuardrails } from "../components/Guardrails";
+import { GuardrailsEditor, GuardrailsSummary, sameGuardrails } from "../components/Guardrails";
 import { Timeline } from "../components/Timeline";
 import { AddrLink, Ago, Avatar, Card, Copyable, Empty, IArrow, ICheck, IChevronDown, Skel, Tag, TxLink } from "../components/ui";
 import { clock, date, daysLeft, num, short } from "../lib/format";
@@ -163,6 +163,7 @@ function GuardrailsSection({ p, k }: { p: P; k: KeyHolding }) {
   const walletAcc = useStore(s => s.wallet);
   useEffect(() => { if (!busy) setG(k.guardrails ?? DEFAULT_GUARDRAILS); }, [JSON.stringify(k.guardrails)]);
   const dirty = !sameGuardrails(g, base);
+  const [open, setOpen] = useState(false);
   const needsWallet = !p.isDemo && walletAcc !== p.follower;
 
   const save = async () => {
@@ -185,8 +186,15 @@ function GuardrailsSection({ p, k }: { p: P; k: KeyHolding }) {
           {k.guardrailsActive ? <><ICheck size={12} />Agent enforcing <span class="mono">{hashLabel(k.guardrailsHashOnChain)}</span></> : <>Waiting for on-chain update</>}
         </span>
       </div>
-      <GuardrailsEditor value={g} onChange={setG} disabled={busy || k.status !== "active"} />
-      <div class="gr__foot">
+      {!open && !dirty ? (
+        <>
+          <GuardrailsSummary g={base} />
+          {k.status === "active" && <button type="button" class="linkbtn gr__edit" onClick={() => setOpen(true)}>Edit guardrails</button>}
+        </>
+      ) : (
+        <GuardrailsEditor value={g} onChange={setG} disabled={busy || k.status !== "active"} />
+      )}
+      {(open || dirty) && <div class="gr__foot">
         <span class="muted gr__hash">{dirty ? "Unsaved changes" : k.guardrailsActive ? "Saved on-chain" : <>On-chain <span class="mono">{k.guardrailsHashOnChain ? hashLabel(k.guardrailsHashOnChain) : "—"}</span></>}</span>
         {sent && <TxLink tx={sent} />}
         {err && <span class="inline-err">{err}</span>}
@@ -196,7 +204,7 @@ function GuardrailsSection({ p, k }: { p: P; k: KeyHolding }) {
             {busy ? <><span class="spin spin--inv" />Saving</> : needsWallet ? "Connect wallet to save" : p.isDemo ? "Save" : "Sign & save"}
           </button>
         </span>
-      </div>
+      </div>}
     </div>
   );
 }

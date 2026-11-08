@@ -1,7 +1,7 @@
 import { api, ApiError } from "../api/client";
-import type { Guardrails, TxRef } from "../api/types";
+import type { Guardrails, StepKey, Timeline, TimelineStep, TxRef } from "../api/types";
 import * as wallet from "../wallet/wallet";
-import { DEMO_ACCOUNT, getState, notify, refreshPortfolio, refreshTimeline, setIdentity, setState } from "./store";
+import { DEMO_ACCOUNT, getState, notify, refreshPortfolio, refreshTimeline, setIdentity, setState, tlKey } from "./store";
 
 export const DEFAULT_GUARDRAILS: Guardrails = {
   maxTradeQuote: "250000000",
@@ -91,10 +91,22 @@ export async function initWallet() {
   else { notify("Guardrails update sent."); refreshPortfolio(); }
 }
 
+function startTimeline(follower: string, trader: string, tx: TxRef) {
+  const labels: [StepKey, string][] = [["subscribed", "Subscribed"], ["sealed", "Key sealed to agent"], ["decrypted", "Trades decrypted"], ["copied", "Copied on Solana"]];
+  const steps: TimelineStep[] = labels.map(([key, label], i) =>
+    i === 0
+      ? { key, label, status: "active", detail: "Waiting for the registry to confirm", txs: [tx], at: Date.now() }
+      : { key, label, status: "waiting", detail: "", txs: [] },
+  );
+  const t: Timeline = { follower, trader, agentPubkey: "", complete: false, steps };
+  setState(s => ({ timelines: { ...s.timelines, [tlKey(follower, trader)]: t } }));
+}
+
 async function finishSubscribe(follower: string, trader: string, txHash: string): Promise<TxRef | undefined> {
   setIdentity({ kind: "wallet", account: follower });
   try {
     const r = await api.notify({ follower, trader, txHash });
+    startTimeline(follower, trader, r.tx);
     notify("Key bought. Sealing it to your agent.", "ok", r.tx);
     return r.tx;
   } catch (e) {
@@ -123,9 +135,15 @@ export async function buyWithWallet(trader: string, guardrails: Guardrails): Pro
 export async function buyWithDemo(trader: string, guardrails: Guardrails): Promise<TxRef> {
   const r = await api.demoSubscribe({ trader, guardrails });
   setIdentity({ kind: "demo", account: r.follower || DEMO_ACCOUNT });
+  startTimeline(r.follower || DEMO_ACCOUNT, trader, r.tx);
   refreshTimeline(r.follower || DEMO_ACCOUNT, trader);
   refreshPortfolio();
   return r.tx;
+}
+
+export async function renewKey(trader: string, guardrails: Guardrails): Promise<void> {
+  if (getState().identity?.kind === "demo") await buyWithDemo(trader, guardrails);
+  else await buyWithWallet(trader, guardrails);
 }
 
 export async function saveGuardrails(trader: string, guardrails: Guardrails): Promise<{ hash: string; tx?: TxRef }> {
