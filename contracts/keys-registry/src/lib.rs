@@ -405,7 +405,6 @@ impl KeysRegistry {
         emit_event("pnl", serde_json::json!([{"trader": trader}]));
     }
 
-
     pub fn get_trader(&self, account: AccountId) -> Option<TraderView> {
         self.traders.get(&account).map(|t| trader_view(&account, &t))
     }
