@@ -29,3 +29,11 @@ apps/keys/playwright-report/
 
 # Local agent runtime state (no secrets; secrets live in ~/.polypus-keys)
 .polypus-run/
+
+# Extra guards
+*-keypair.json
+*_SECRET*
+*.pem
+*.log
+.DS_Store
+**/node_modules/

@@ -1,4 +1,4 @@
-# Polypus Keys status (2026-11-08)
+# Polypus Keys status (2026-11-13)
 
 The app runs end to end on NEAR testnet and Solana devnet with `npm run dev:all`. A purchase, from the wallet or the demo account, produces real transactions at every step, and the UI links each one as it lands.
 
@@ -9,7 +9,7 @@ The app runs end to end on NEAR testnet and Solana devnet with `npm run dev:all`
 | Wallet purchase | NEAR Wallet Selector (MyNearWallet, Meteor, Intear, HERE) signs `subscribe` on `polypus-keys-18e5.testnet` with the key price attached. Not exercised in a browser run here: no wallet extension in the test browser; the call shape is the same one the demo path signs server-side. |
 | Demo purchase | `POST /api/demo/subscribe` signs as `carol-18e5.testnet`, rate limited. Driven by `apps/keys/tools/screenshots.mjs`. |
 | Key delivery | The trader node sees the subscription and calls `rotate_epoch`, sealing the epoch key to the agent's X25519 key. |
-| Encrypted feed | Trader node posts a paper trade every 60-90 s at live prices (`post_feed`). The agent decrypts it. |
+| Encrypted feed | Trader node checks its strategy every 60-90 s and posts a paper trade at the live price when it has a signal (`post_feed`). The agent decrypts it. |
 | Attested PnL | Attestor decrypts the same feed and calls `publish_pnl`; the contract verifies the ed25519 signature. Return, trade count and win rate in the app come from that statement. |
 | Guardrails | Max per trade, copy size and token allowlist are editable, enforced by the agent, committed on-chain with `update_guardrails`. Heron's BONK trades are skipped under the default allowlist. |
 | Copy on Solana | Chain Signatures (`v1.signer-prod.testnet`) signs a Solana devnet transaction from an MPC-derived address. |
@@ -29,7 +29,7 @@ Run of 2026-11-08 (demo account, kestrel, all finalized; `node scripts/verify-tx
 | Piece | State |
 |---|---|
 | Agent and attestor TEE | Local processes. The agent binds to a fresh NEAR AI gateway attestation; neither runs inside an enclave. The attestor's statements say `attestation_kind: simulated`. |
-| Trades | Paper trades at live prices from a seeded random book, not a real strategy. Returns are small and can be negative. |
+| Trades | Paper trades at live prices from fixed rules (`agents/shared/strategy.ts`): kestrel follows momentum on SOL/JUP, heron mean-reverts on SOL/BONK. No fees or slippage. History before 2026-11-13 came from a seeded random book and stays on-chain. |
 | Swap venue | Devnet has no JUP or BONK liquidity, so a copy is a signed receipt transaction (memo commitment), not a swap. |
 | ZK `copy_guardrail` | Noir circuit and reference checks exist; no on-chain proof verification in the copy path. |
 | Testnet RPC | FastNEAR rate limits under load; the services fail over and retry copies up to three times. |
@@ -38,9 +38,9 @@ Run of 2026-11-08 (demo account, kestrel, all finalized; `node scripts/verify-tx
 
 | Item | Owner |
 |---|---|
-| Public repo, X post, submission form before 2026-11-14 23:59 UTC | user |
+| Make the repo public, X post, submission form before 2026-11-14 23:59 UTC | user |
 | Mainnet 1Click payment demo | user wallet, small amount |
-| More devnet SOL for the deployer and MPC address | `scripts/FUND_DEVNET.md` |
+| More devnet SOL for the deployer and MPC address | https://faucet.solana.com |
 
 ## Commands
 

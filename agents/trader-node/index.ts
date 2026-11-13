@@ -5,8 +5,9 @@ import { decryptFeedRecord, encryptFeedRecord, randomEpochKey, sealEpochKey } fr
 import { ATTESTOR_ID, KEYS_DIR, PORTS, REGISTRY, TRADERS, nearTxUrl } from "../shared/config.js";
 import { call, getFeed, sleep, view, type SubscriptionOnChain, type TraderOnChain } from "../shared/near.js";
 import { logger, readJson, runFile, serve, writeJson } from "../shared/run.js";
-import { getPrices } from "../shared/prices.js";
-import { makeRecord, nextTrade, replay, type TradeRecord } from "../shared/book.js";
+import { getPrices, recentSeries, type Sym } from "../shared/prices.js";
+import { makeRecord, replay, type TradeRecord } from "../shared/book.js";
+import { STRATEGIES, decide, type Series } from "../shared/strategy.js";
 
 const log = logger("trader");
 const MIN_S = Number(process.env.POLYPUS_TRADE_MIN_S ?? 60);
@@ -127,8 +128,15 @@ async function postTrade(st: TraderState, epoch: number, key: Uint8Array) {
   const secrets = loadSecrets(st.account);
   const book = replay(await ownTrades(st.account, secrets));
   const prices = await getPrices(20_000);
-  const d = nextTrade(st.handle, book, prices);
-  if (!d) return;
+  const series: Partial<Record<Sym, Series>> = {};
+  const wanted = new Set<Sym>(STRATEGIES[st.handle]?.tokens ?? []);
+  for (const [sym, pos] of Object.entries(book.positions) as [Sym, { qty: number }][]) if (pos.qty > 0) wanted.add(sym);
+  for (const sym of wanted) series[sym] = await recentSeries(sym, prices[sym]);
+  const d = decide(st.handle, book, series, Date.now());
+  if (!d) {
+    log.info(`${st.handle}: no signal`);
+    return;
+  }
   const rec = makeRecord(st.account, epoch, d, new Date(), prices.source);
   const ct = encryptFeedRecord(st.account, epoch, key, rec as unknown as Record<string, unknown>);
   const res = await call(st.account, REGISTRY, "post_feed", { epoch, ciphertext: ct }, { gas: 50 });

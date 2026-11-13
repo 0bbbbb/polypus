@@ -9,8 +9,6 @@ use crate::kernel::{recompute_public, verify_action};
 global TWO_POW_64: Field = 18446744073709551616;
 global TWO_POW_26: Field = 67108864;
 
-// ---------------------------------------------------------------- honest cases
-
 #[test]
 fn honest_deposit() {
     verify_action(fixtures::deposit());
@@ -48,8 +46,6 @@ fn program_path_with_correct_io_hash_is_accepted() {
     verify_action(recompute_public(w));
 }
 
-// ---------------------------------------------------------------- K1 amounts
-
 #[test(should_fail_with = "call to assert_max_bit_size")]
 fn k1_output_amount_2_pow_64() {
     // Wraparound mint attempt: out0 = 2^64 + 60, out1 = 40 - 2^64 (mod p).
@@ -74,8 +70,6 @@ fn k1_input_amount_out_of_range() {
     verify_action(recompute_public(w));
 }
 
-// ---------------------------------------------------------------- K2 public amount
-
 #[test(should_fail_with = "call to assert_max_bit_size")]
 fn k2_public_amount_too_large() {
     let mut w = fixtures::deposit();
@@ -89,8 +83,6 @@ fn k2_public_amount_too_negative() {
     w.public.public_amount = -TWO_POW_64 - 1;
     verify_action(recompute_public(w));
 }
-
-// ---------------------------------------------------------------- K3/K4 ownership and membership
 
 #[test(should_fail_with = "K4: input not in tree")]
 fn k3_wrong_spend_key() {
@@ -158,8 +150,6 @@ fn k4_leaf_index_out_of_range() {
     verify_action(recompute_public(w));
 }
 
-// ---------------------------------------------------------------- K5 nullifier
-
 #[test(should_fail_with = "K5: nullifier")]
 fn k5_tampered_nullifier() {
     let mut w = fixtures::transfer_1in();
@@ -180,16 +170,12 @@ fn k5_nullifier_of_other_index() {
     verify_action(w);
 }
 
-// ---------------------------------------------------------------- K6 distinct nullifiers
-
 #[test(should_fail_with = "K6: duplicate nullifier")]
 fn k6_duplicate_nullifiers() {
     let mut w = fixtures::deposit();
     w.inputs[1] = w.inputs[0];
     verify_action(recompute_public(w));
 }
-
-// ---------------------------------------------------------------- K7 outputs
 
 #[test(should_fail_with = "K7: output commitment")]
 fn k7_tampered_output_commitment() {
@@ -221,8 +207,6 @@ fn k7_locked_output_without_escape() {
     verify_action(recompute_public(w));
 }
 
-// ---------------------------------------------------------------- K8 conservation
-
 #[test(should_fail_with = "K8: value not conserved")]
 fn k8_output_off_by_one() {
     let mut w = fixtures::transfer_2in_fee();
@@ -244,8 +228,6 @@ fn k8_deposit_mints_extra() {
     verify_action(recompute_public(w));
 }
 
-// ---------------------------------------------------------------- K9 asset binding
-
 #[test(should_fail_with = "K9: asset mismatch")]
 fn k9_public_asset_mismatch() {
     let mut w = fixtures::deposit();
@@ -259,8 +241,6 @@ fn k9_hidden_asset_with_public_amount() {
     w.public.public_asset_id = 0;
     verify_action(recompute_public(w));
 }
-
-// ---------------------------------------------------------------- K10 lock rule
 
 #[test(should_fail_with = "K10: input locked to another program")]
 fn k10_locked_input_spent_as_plain_transfer() {
@@ -280,8 +260,6 @@ fn k10_locked_input_spent_under_other_program() {
     w.public.program_id = 78;
     verify_action(recompute_public(w));
 }
-
-// ---------------------------------------------------------------- K11 program binding
 
 #[test(should_fail_with = "K11: program_io_hash must be 0 for program 0")]
 fn k11_nonzero_io_hash_for_program_0() {
@@ -308,8 +286,6 @@ fn k11_io_hash_with_other_params() {
     r.program_params_hash = 1; // proof for different public params
     verify_action(r);
 }
-
-// ---------------------------------------------------------------- K12 public-input binding
 
 #[test(should_fail_with = "K12: pi_hash")]
 fn k12_tampered_ext_data_hash() {

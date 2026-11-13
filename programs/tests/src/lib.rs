@@ -401,9 +401,7 @@ impl ActionFixture {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SPL Token account fixtures (packed by hand to avoid a second solana-* major).
-
+// SPL Token accounts are packed by hand to avoid pulling a second solana-* major.
 pub fn pack_mint(authority: &Address, decimals: u8) -> Vec<u8> {
     let mut d = vec![0u8; 82];
     d[0..4].copy_from_slice(&1u32.to_le_bytes()); // COption::Some
@@ -427,8 +425,6 @@ pub fn token_amount(svm: &LiteSVM, a: &Address) -> u64 {
     let acc = svm.get_account(a).expect("token account");
     u64::from_le_bytes(acc.data[64..72].try_into().unwrap())
 }
-
-// ---------------------------------------------------------------------------
 
 pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
 
@@ -784,9 +780,6 @@ pub fn legacy_tx_size(ixs: &[Instruction], payer: &Address) -> usize {
     }
     n
 }
-
-// ---------------------------------------------------------------------------
-// Bench program (test-only, see ../verifier-bench).
 
 /// CU charged by one `sol_log_compute_units` call (Agave `syscall_base_cost`).
 pub const LOG_CU_SYSCALL_COST: u64 = 100;

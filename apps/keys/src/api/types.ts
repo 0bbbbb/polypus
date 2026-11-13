@@ -1,7 +1,4 @@
-/**
- * Wire types for the local Polypus Keys API (agents/api, http://127.0.0.1:8787, proxied by Vite at /api).
- * Shared by the server (agents/api/server.ts) and the app. All times are unix milliseconds.
- */
+// Wire types for agents/api (proxied at /api). Times are unix milliseconds.
 
 export type Chain = "near" | "solana";
 
@@ -57,14 +54,11 @@ export type TraderSummary = {
   attestorPubkey: string;
   attestorDigest: string;
   feedLen: number;
-  /** posted_at of the newest feed entry */
   lastTradeAt: number | null;
-  /** trader-node is running and posting */
   live: boolean;
   pnl: PnlView | null;
 };
 
-/** One on-chain feed entry. Ciphertext only; plaintext comes from the follower agent after unlock. */
 export type FeedRow = {
   seq: number;
   epoch: number;
@@ -75,7 +69,7 @@ export type FeedRow = {
 };
 
 export type TraderDetail = TraderSummary & {
-  feed: FeedRow[]; // newest first, up to 60
+  feed: FeedRow[];
 };
 
 export type DecryptedTrade = {
@@ -83,9 +77,9 @@ export type DecryptedTrade = {
   id: string;
   side: "buy" | "sell";
   symbol: string;
-  baseAmount: string; // human, e.g. "1.25"
-  quoteAmount: string; // human pUSD, e.g. "112.40"
-  price: string; // human USD
+  baseAmount: string;
+  quoteAmount: string;
+  price: string;
   executedAt: number;
   postedAt: number;
   backfilled: boolean;
@@ -114,8 +108,8 @@ export type CopyRecord = {
   tradeId: string;
   side: "buy" | "sell";
   symbol: string;
-  traderQuote: string; // human pUSD
-  copiedQuote: string; // human pUSD, "0" when skipped
+  traderQuote: string;
+  copiedQuote: string; // "0" when skipped
   action: CopyAction;
   reason: string;
   explanation: string;
@@ -163,18 +157,16 @@ export type KeyHolding = {
   status: "active" | "cancelled" | "expired";
   expiresAt: number;
   agentPubkey: string;
-  /** the local follower agent holds the secret for this pubkey */
   agentManaged: boolean;
   guardrails: Guardrails | null;
   guardrailsHashOnChain: string;
-  /** agent's guardrails hash matches the on-chain commitment */
   guardrailsActive: boolean;
   /** Solana devnet address the agent copies from (Chain Signatures derived) */
   copyWallet: string;
   copyWalletSol: number | null;
   mpcPath: string;
-  decrypted: DecryptedTrade[]; // newest first
-  copies: CopyRecord[]; // newest first
+  decrypted: DecryptedTrade[];
+  copies: CopyRecord[];
   timeline: Timeline;
 };
 
@@ -202,7 +194,6 @@ export type ProvisionResponse = {
   agentAttestationDigest: string;
   guardrailsHash: string;
   guardrails: Guardrails;
-  /** exact call for the wallet to sign */
   call: {
     receiverId: string;
     methodName: "subscribe";
@@ -287,30 +278,10 @@ export type IntentsStatus = {
 
 export type Prices = { SOL: number; JUP: number; BONK: number; at: number; source: string };
 
-/** SSE `GET /api/stream` emits `event: <type>` with JSON data. */
 export type StreamEvent =
   | { type: "activity"; item: ActivityItem }
   | { type: "traders"; traders: TraderSummary[] }
   | { type: "timeline"; timeline: Timeline }
   | { type: "portfolio"; follower: string };
 
-/**
- * Routes:
- *   GET  /api/health                       HealthView
- *   GET  /api/traders                      TraderSummary[]
- *   GET  /api/traders/:account             TraderDetail
- *   GET  /api/prices                       Prices
- *   GET  /api/portfolio/:follower          Portfolio
- *   GET  /api/timeline?follower=&trader=   Timeline
- *   GET  /api/activity                     ActivityItem[] (newest first, 40)
- *   GET  /api/proof                        ProofView
- *   GET  /api/stream?follower=             SSE of StreamEvent
- *   GET  /api/intents                      IntentsStatus
- *   GET  /api/quote?trader=&pay=<optionId> IntentsQuote
- *   POST /api/agent/provision              ProvisionRequest -> ProvisionResponse
- *   POST /api/subscriptions/notify         NotifyRequest -> { ok: true, tx: TxRef }
- *   POST /api/demo/subscribe               DemoSubscribeRequest -> DemoSubscribeResponse (rate limited, 429 {error, retryAfterSec})
- *   POST /api/guardrails                   GuardrailsUpdateRequest -> GuardrailsUpdateResponse
- * Errors: non-2xx with { error: string }.
- */
 export const API_BASE = "/api";

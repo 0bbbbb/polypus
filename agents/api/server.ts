@@ -46,7 +46,8 @@ import {
   type TraderOnChain,
 } from "../shared/near.js";
 import { HttpError, getJson, logger, postJson, readBody, readJson, runFile, serve, writeJson } from "../shared/run.js";
-import { STYLES, fromUnits, type TradeRecord } from "../shared/book.js";
+import { fromUnits, type TradeRecord } from "../shared/book.js";
+import { STRATEGIES } from "../shared/strategy.js";
 import { getPrices } from "../shared/prices.js";
 import { verifyStatement } from "../shared/pnl.js";
 import { PAY_OPTIONS, dryQuote } from "../shared/oneclick.js";
@@ -197,7 +198,7 @@ async function summarize(t: TraderOnChain, ts: TraderStatus | null, att: Attesto
     account: t.account,
     handle: t.handle,
     bio: t.bio,
-    style: STYLES[t.handle]?.tokens.join(" · ") ?? "",
+    style: STRATEGIES[t.handle]?.tokens.join(" · ") ?? "",
     priceYocto: t.price,
     priceNear: (Number(BigInt(t.price) / 10n ** 18n) / 1e6).toString(),
     periodDays: t.period_days,

@@ -6,16 +6,16 @@ import { ATTESTOR_ID, KEYS_DIR, REGISTRY, ROOT, TRADERS } from "../shared/config
 import { call, getFeed, view, type TraderOnChain } from "../shared/near.js";
 import { readJson, runFile, writeJson, logger } from "../shared/run.js";
 import { derivedSolanaAddress } from "../shared/chainsig.js";
-import { makeRecord, nextTrade, STYLES, type BookState } from "../shared/book.js";
-import { priceAt, priceHistory, SYMS, type Sym } from "../shared/prices.js";
+import { makeRecord, replay, type TradeRecord } from "../shared/book.js";
+import { STYLE_BIO, decide, type Series } from "../shared/strategy.js";
+import { priceHistory, SYMS, type Sym } from "../shared/prices.js";
 import { agentAttestationBinding } from "../shared/tee.js";
 
 const log = logger("seed");
 const PROFILES: Record<string, { bio: string; price: string }> = {
-  kestrel: { bio: STYLES.kestrel!.style, price: "500000000000000000000000" },
-  heron: { bio: STYLES.heron!.style, price: "300000000000000000000000" },
+  kestrel: { bio: STYLE_BIO.kestrel!, price: "500000000000000000000000" },
+  heron: { bio: STYLE_BIO.heron!, price: "300000000000000000000000" },
 };
-const COUNTS: Record<string, number> = { kestrel: 14, heron: 11 };
 
 function attestor(): { x25519: string; ed25519: string } {
   const r = spawnSync("npx", ["tsx", "attestor/index.ts", "--once"], { cwd: path.join(ROOT, "agents"), stdio: "inherit" });
@@ -85,27 +85,15 @@ for (const account of TRADERS) {
     continue;
   }
   for (const s of SYMS) history[s] ??= await priceHistory(s, 5);
-  const n = COUNTS[t.handle] ?? 10;
   const now = Date.now();
-  const start = now - 4 * 864e5;
-  const times = Array.from({ length: n }, (_, i) => start + ((i + Math.random() * 0.6) / n) * (now - start - 3600_000)).sort((a, b) => a - b);
-  const book: BookState = { positions: {}, cash: 2000 };
-  for (const at of times) {
-    const px = Object.fromEntries(SYMS.map(s => [s, priceAt(history[s]!, at)])) as Record<Sym, number>;
-    const d = nextTrade(t.handle, book, px);
+  const sent: TradeRecord[] = [];
+  for (let at = now - 4 * 864e5; at < now - 3600_000; at += 3600_000) {
+    const series: Partial<Record<Sym, Series>> = {};
+    for (const s of SYMS) series[s] = history[s]!.filter(p => p[0] <= at);
+    const d = decide(t.handle, replay(sent), series, at);
     if (!d) continue;
     const rec = makeRecord(account, epoch, d, new Date(at), "coingecko-history", true);
-    const pos = (book.positions[d.sym] ??= { qty: 0, cost: 0 });
-    if (d.side === "buy") {
-      pos.qty += d.qty;
-      pos.cost += d.usd;
-      book.cash -= d.usd;
-    } else {
-      const avg = pos.qty ? pos.cost / pos.qty : 0;
-      pos.cost -= avg * d.qty;
-      pos.qty -= d.qty;
-      book.cash += d.usd;
-    }
+    sent.push(rec);
     const ct = encryptFeedRecord(account, epoch, key, rec as unknown as Record<string, unknown>);
     const res = await call(account, REGISTRY, "post_feed", { epoch, ciphertext: ct }, { gas: 50 });
     const seq = (res.events.find(e => e.event === "feed") as { data?: { seq?: number }[] } | undefined)?.data?.[0]?.seq;

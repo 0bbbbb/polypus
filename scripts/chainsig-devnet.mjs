@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-/**
- * Carol (NEAR testnet) → MPC-derived Solana address → sign + submit devnet transfer.
- * Updates deployments/devnet.json with chain_signatures proof fields.
- */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

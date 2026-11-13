@@ -19,11 +19,6 @@ export type TradeRecord = {
   provenance: { kind: "paper"; priceSource: string };
 };
 
-export const STYLES: Record<string, { tokens: Sym[]; minUsd: number; maxUsd: number; style: string }> = {
-  kestrel: { tokens: ["SOL", "JUP"], minUsd: 80, maxUsd: 240, style: "Rotates between SOL and JUP in small size" },
-  heron: { tokens: ["SOL", "BONK", "JUP"], minUsd: 40, maxUsd: 160, style: "Solana momentum with quick rotations into BONK and JUP" },
-};
-
 export function toUnits(amount: number, decimals: number): string {
   return BigInt(Math.round(amount * 10 ** decimals)).toString();
 }
@@ -32,7 +27,7 @@ export function fromUnits(units: string, decimals: number): number {
   return Number(BigInt(units)) / 10 ** decimals;
 }
 
-export type Position = { qty: number; cost: number };
+export type Position = { qty: number; cost: number; openedAt?: number };
 export type BookState = { positions: Partial<Record<Sym, Position>>; cash: number };
 
 export function replay(trades: TradeRecord[]): BookState {
@@ -48,6 +43,7 @@ function applyTrade(st: BookState, t: TradeRecord): number {
   const p = st.positions[sym] ?? { qty: 0, cost: 0 };
   let realized = 0;
   if (t.side === "buy") {
+    if (p.qty === 0) p.openedAt = Date.parse(t.executedAt);
     p.qty += qty;
     p.cost += usd;
     st.cash -= usd;
@@ -61,33 +57,11 @@ function applyTrade(st: BookState, t: TradeRecord): number {
     if (p.qty < 1e-12) {
       p.qty = 0;
       p.cost = 0;
+      p.openedAt = undefined;
     }
   }
   st.positions[sym] = p;
   return realized;
-}
-
-export function nextTrade(
-  handle: string,
-  st: BookState,
-  prices: Record<Sym, number>,
-  rand: () => number = Math.random,
-): { side: "buy" | "sell"; sym: Sym; usd: number; qty: number; price: number } | null {
-  const style = STYLES[handle] ?? STYLES.kestrel!;
-  const sym = style.tokens[Math.floor(rand() * style.tokens.length)]!;
-  const price = prices[sym];
-  const pos = st.positions[sym];
-  const canSell = pos && pos.qty * price > 5;
-  const sell = canSell && (rand() < 0.5 || st.cash < style.minUsd);
-  if (sell) {
-    const frac = rand() < 0.5 ? 1 : 0.5;
-    const qty = pos!.qty * frac;
-    return { side: "sell", sym, qty, price, usd: qty * price };
-  }
-  const usd = Math.min(st.cash, style.minUsd + rand() * (style.maxUsd - style.minUsd));
-  if (usd < 10) return null;
-  const rounded = Math.round(usd);
-  return { side: "buy", sym, usd: rounded, qty: rounded / price, price };
 }
 
 export function makeRecord(

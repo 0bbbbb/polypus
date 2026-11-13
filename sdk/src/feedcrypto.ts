@@ -1,4 +1,4 @@
-/** Feed encryption for Polypus Keys (INTERFACES.md). UNAUDITED hackathon demo. */
+// Unaudited. AAD strings and byte layouts must match between the trader node, agents and attestor.
 import { x25519 } from "@noble/curves/ed25519";
 import { ed25519 } from "@noble/curves/ed25519";
 import { hkdf } from "@noble/hashes/hkdf";

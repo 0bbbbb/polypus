@@ -1,34 +1,55 @@
-# NEAR HACKATHON submission draft (Polypus Keys)
+# NEAR HACKATHON submission draft: Polypus Keys
 
-**Track:** Privacy & Private AI (`privacy`)  
-**Payout account (user):** `<old-wallet-redacted>` (mainnet implicit — confirm before POST)
+Not sent. Contract and rules: https://nearhackathon.com/HACKATHON.md. Send once, after the repository is public and the demo post is up. Do not commit the final payload; it contains personal data.
 
-## Description (20–2000 chars)
+## Payload
 
-Polypus Keys is private copy-trading for the NEAR ecosystem: traders keep positions shielded on Solana devnet and via NEAR Intents pricing, publish one attested PnL number from a TEE, and sell viewing keys that only a follower’s copy-trade agent (in a TEE) can use—never the human. Followers pay through NEAR Intents 1-Click (dry quotes in the demo; testnet NEAR subscription on-chain). NEAR Chain Signatures tie each trader’s NEAR account to a Solana depositor. Built for NEAR HACKATHON.
+```json
+{
+  "requestId": "TODO: generate at send time with `node -e 'console.log(crypto.randomUUID())'` and reuse on retries",
+  "projectName": "Polypus Keys",
+  "leadName": "TODO",
+  "email": "TODO",
+  "size": "TODO: one of 1, 2 - 4, 4 - 6, 6 - 8, 8+",
+  "tracks": ["privacy", "defi", "agents", "security"],
+  "nearAddress": "TODO: confirm. Suggested: c597687cf596d624770c55380b4fa25c68da74a3f9995ba9311b709f702d1e3b",
+  "projectUrl": "https://github.com/0bbbbb/polypus",
+  "demoUrl": "TODO: link to the X demo post",
+  "idea": "Copy-trading either leaks a trader's strategy to anyone who can read the chain or asks followers to hand a bot unlimited control. Polypus Keys lets a trader post every trade to a NEAR contract as ciphertext and sell time-limited keys; a buyer's agent receives the epoch key sealed to its own key, applies the buyer's guardrails, and copies the trade on Solana devnet through NEAR Chain Signatures, so no Solana key exists. An attestor signs the trader's PnL from the same feed and the contract verifies the signature on-chain; copy decisions are explained by NEAR AI Cloud with the gateway signature verified, and NEAR Intents 1Click gives dry quotes for paying from other chains. Trades are paper trades on live prices, the agent and attestor TEEs are simulated, and everything runs on NEAR testnet and Solana devnet.",
+  "consent": true
+}
+```
 
-## Blockers (human action)
+Before sending:
 
-- **Solana devnet:** program deployed; proofs and explorer links in [deployments/devnet.json](../../deployments/devnet.json) (copied to the app under `apps/keys/public/deployments/`).
-- **NEAR AI Cloud / OutLayer:** `NEARAI_API_KEY` for live TEE inference labels (agents run SIMULATED without it).
-- **1Click Partner JWT:** confidential Intents checkout (dry quotes work without it).
+- Replace every TODO. `nearAddress` must be an account you control; the wallet used in earlier drafts is compromised and must not be used.
+- `consent` is `true` only after you agree to: "I agree that the organizers may use these details to review our submission and contact us about this hackathon."
+- `idea` must stay between 20 and 2000 characters (the text above is about 900).
+- Print the final JSON and confirm it before the POST to https://nearhackathon.com/api/applications. A second submission of the same repository is rejected with 409; fix mistakes at https://nearhackathon.com/request-changes.
 
-## Checklist (human)
+## Checklist
 
-- [ ] Make `polypus` repo **public** (GitHub or Origin) before **2026-11-14 23:59 UTC**
-- [ ] Post public **X demo** (video or screenshots) mentioning NEAR HACKATHON
-- [ ] POST `/api/applications` once (no resubmit — use request-changes for fixes)
-- [ ] LICENSE file in repo root (Apache-2.0 matches crates)
-- [ ] Confirm payout NEAR account in submission form
-- [ ] Optional: tiny mainnet Intents payment demo (~$1) — **requires explicit wallet approval**
+- [ ] Repository public before 2026-11-14T23:59Z
+- [ ] Demo video recorded and the X post published
+- [ ] Payload filled and confirmed
+- [ ] Keep the repository public through judging (2026-11-16 to 2026-11-18)
 
-## Demo assets
+## X demo post (draft)
 
-- App: `npm run app` → http://127.0.0.1:5174
-- End-to-end script: `npm run demo` · live agent loop: `npm run demo:live`
-- Gap list: `docs/hackathon/STATUS.md`
-- Screenshots: `apps/keys/screenshots/` (after `npm run screenshots -w apps/keys`)
+```
+Copy-trading today either leaks the trader's strategy or hands a bot your keys.
 
-## Prior work disclosure
+We built Polypus Keys at NEAR HACKATHON: traders post every trade to a NEAR contract as ciphertext and sell keys. Your agent gets the key sealed to it, applies your guardrails, and copies the trade on Solana through NEAR Chain Signatures. No Solana key exists anywhere.
 
-Solana Polypus pool, circuits, and SDK predate the hackathon window; **only NEAR integration** (registry contract, Intents checkout, Chain Signatures, TEE agents) is judged. See `docs/hackathon/HACKATHON-RULES.md` and tag `pre-hackathon-baseline` (if applied).
+Video: one purchase, from "Buy key" to a finalized devnet tx.
+
+NEAR does the work: contract-held encrypted feed and on-chain PnL check, Chain Signatures for signing, NEAR AI Cloud for attested explanations, Intents for pay-from-any-chain quotes.
+
+Paper trades on testnet/devnet. Repo: https://github.com/0bbbbb/polypus  Site: https://polypus.fi
+
+Where would you want a hard limit on what a copy agent can do?
+
+@NEARProtocol #NEARHackathon
+```
+
+Attach the demo video. Add @NearLegion or @NearBuilders if you want more reach.

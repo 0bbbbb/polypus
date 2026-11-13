@@ -18,9 +18,8 @@ bal=$(solana balance -k "$KP" --url "$RPC" | awk '{print $1}')
 echo "Deployer $(solana address -k "$KP") balance: $bal SOL on devnet"
 awk -v b="$bal" -v m="$MIN_SOL" 'BEGIN{ exit (b+0 >= m) ? 0 : 1 }' || {
   echo ""
-  echo "BLOCKER: need ≥${MIN_SOL} SOL on devnet. Public RPC airdrop is closed; devnet-pow needs ~5000 lamports fee payer."
+  echo "need ≥${MIN_SOL} SOL on devnet. Public RPC airdrop is closed; devnet-pow needs ~5000 lamports fee payer."
   echo "Fund $(solana address -k "$KP") via https://faucet.solana.com (GitHub login), then re-run."
-  echo "See scripts/FUND_DEVNET.md"
   exit 2
 }
 

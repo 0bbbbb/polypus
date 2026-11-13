@@ -12,7 +12,7 @@
     "setup:live": "tsx scripts/setup-live.ts",
     "setup:agent": "tsx scripts/create-agent-account.ts",
     "typecheck": "tsc --noEmit -p .",
-    "test": "tsx --test test/guardrails.test.ts"
+    "test": "tsx --test test/guardrails.test.ts test/strategy.test.ts"
   },
   "dependencies": {
     "@noble/curves": "^1.9.0",

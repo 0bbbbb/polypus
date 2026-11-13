@@ -72,3 +72,18 @@ export function priceAt(series: [number, number][], t: number): number {
   }
   return best[1];
 }
+
+const seriesCache = new Map<Sym, { at: number; points: [number, number][] }>();
+
+export async function recentSeries(sym: Sym, live: number): Promise<[number, number][]> {
+  const hit = seriesCache.get(sym);
+  if (!hit || Date.now() - hit.at > 30 * 60_000) {
+    try {
+      seriesCache.set(sym, { at: Date.now(), points: await priceHistory(sym, 2) });
+    } catch (e) {
+      if (!hit) throw e;
+    }
+  }
+  const now = Date.now();
+  return [...seriesCache.get(sym)!.points.filter(p => p[0] < now - 60_000), [now, live]];
+}

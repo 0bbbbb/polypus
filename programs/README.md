@@ -1,6 +1,6 @@
 # Polypus on-chain programs
 
-> ## ⚠️ UNAUDITED — DEVNET / LOCALNET ONLY
+> ## UNAUDITED — DEVNET / LOCALNET ONLY
 > This code has not been audited. Never deploy it to mainnet and never use it
 > with real funds. The dev kernel VK comes from an **insecure single-party
 > setup**. Builds made with the test VKs in this directory are deliberately
